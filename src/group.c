@@ -1,8 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// #include <stdio.h> // TODO remove me
-
 #include "group.h"
 #include "params.h"
 #include "fips202.h"
@@ -307,19 +305,6 @@ void random_pk(uint8_t pk[PK_BYTES])
     randombytes(seed, 2 * SEED_BYTES);
     gen_pk(pk, seed);
 }
-/*
-static void print_pk(const uint8_t pk[PK_BYTES])
-{
-    size_t i;
-    for (i = 0; i < 4; ++i) {
-        printf("%02x", pk[i]);
-    }
-    printf("...");
-    for (i = 4; i > 0; i--) {
-        printf("%02x", pk[PK_BYTES-i]);
-    }
-}
-*/
 
 /// Hash public keys into a new public key
 ///
@@ -334,113 +319,12 @@ void hash_pks(uint8_t pk[PK_BYTES], const uint8_t * const pks[OTKEM_N - 1], cons
     uint8_t seed[2 * SEED_BYTES];
     size_t i;
 
-    /*
-    printf("hash ");
-    for (i = 0; i < HID_BYTES; i++) {
-        printf("%02x", hid[i]);
-    }
-    printf(":\n");
-    */
-
     sha3_512_inc_init(&state);
     sha3_512_inc_absorb(&state, hid, HID_BYTES);
     for (i = 0; i < OTKEM_N - 1; i++) {
-        // printf("  "); print_pk(pks[i]); printf("\n");
         sha3_512_inc_absorb(&state, pks[i], PK_BYTES);
     }
     sha3_512_inc_finalize(seed, &state);
     gen_pk(pk, seed);
 }
 
-#if TEST_GROUP == 1
-
-#include <stdio.h>
-#include <assert.h>
-
-#define NTESTS 100
-
-static int eq(const uint8_t *x, const uint8_t *y, size_t len)
-{
-    size_t i;
-    for (i = 0; i < len; i++) {
-        if (x[i] != y[i]) {
-            fprintf(stderr, "Differ at pos %zu: %02x != %02x\n", i, x[i], y[i]);
-            return 0;
-        }
-    }
-    return 1;
-}
-
-static void print_pk(const uint8_t pk[PK_BYTES])
-{
-    size_t i;
-    
-    for (i = 0; i < PK_BYTES; i++) {
-        printf("%02x", pk[i]);
-    }
-    putchar('\n');
-}
-
-static void test_group_ops()
-{
-    uint8_t pk0[PK_BYTES], pk1[PK_BYTES], pk2[PK_BYTES], pk3[PK_BYTES];
-    random_pk(pk0);
-    random_pk(pk1);
-    add_pk(pk2, pk0, pk1);
-    sub_pk(pk3, pk2, pk1);
-    assert(eq(pk3, pk0, PK_BYTES));
-    sub_pk(pk2, pk0, pk1);
-    add_pk(pk3, pk2, pk1);
-    assert(eq(pk3, pk0, PK_BYTES));
-}
-
-static void zero_pk(uint8_t pk[PK_BYTES])
-{
-    size_t ctr, i;
-    uint8_t buf[32] = {0};
-    polyvec a;
-
-    for (i = 0; i < KYBER_K; i++) {
-        ctr = rej_uniform(a.vec[i].coeffs, KYBER_N, buf, 32);
-
-        while(ctr < KYBER_N) {
-            ctr += rej_uniform(a.vec[i].coeffs + ctr, KYBER_N - ctr, buf, 32);
-        }
-    }
-    pack_pk(pk, &a, buf);
-}
-
-static void test_group_id()
-{
-    uint8_t pk0[PK_BYTES], pk1[PK_BYTES], pk2[PK_BYTES];
-    zero_pk(pk0);
-    random_pk(pk1);
-    add_pk(pk2, pk0, pk1);
-    assert(eq(pk1, pk2, PK_BYTES));
-    add_pk(pk2, pk1, pk0);
-    assert(eq(pk1, pk2, PK_BYTES));
-    sub_pk(pk2, pk1, pk0);
-    assert(eq(pk1, pk2, PK_BYTES));
-}
-
-static void test_random()
-{
-    uint8_t pk[PK_BYTES];
-    random_pk(pk);
-    if (0) {
-        print_pk(pk); // print output to see if it looks random...
-    }
-}
-
-int main()
-{
-    size_t i;
-    for (i = 0; i < NTESTS; i++) {
-        test_group_ops();
-        test_group_id();
-    }
-    test_random();
-    return 0;
-}
-
-#endif

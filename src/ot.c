@@ -2,47 +2,12 @@
 #include <stdint.h>
 #include <assert.h>
 
-#include <stdio.h> // TODO REMOVE ME
-
 #include <oqs/oqs.h>
 
 #include "ot.h"
 #include "params.h"
 #include "common.h"
 #include "group.h"
-
-/*
-static void print_ct(const uint8_t ct[CT_BYTES])
-{
-    size_t i;
-    for (i = 0; i < 4; ++i) {
-        printf("%02x", ct[i]);
-    }
-    printf("...");
-    for (i = 4; i > 0; i--) {
-        printf("%02x", ct[CT_BYTES-i]);
-    }
-}
-static void print_pk(const uint8_t pk[PK_BYTES])
-{
-    size_t i;
-    for (i = 0; i < 4; ++i) {
-        printf("%02x", pk[i]);
-    }
-    printf("...");
-    for (i = 4; i > 0; i--) {
-        printf("%02x", pk[PK_BYTES-i]);
-    }
-}
-
-static void print_ss(const uint8_t ss[SS_BYTES])
-{
-    size_t i;
-    for (i = 0; i < SS_BYTES; ++i) {
-        printf("%02x", ss[i]);
-    }
-}
-*/
 
 /// Initialize the OT Receiver
 ///
@@ -77,11 +42,8 @@ void kemot_receiver_init(uint8_t sk[SK_BYTES],
     hash_pks(digest, pk_pointers, hash_id);
     rc = OQS_KEM_kyber_768_keypair(pks, sk);
     assert(rc == OQS_SUCCESS);
-    // printf("  Receiver pk: "); print_pk(pks); printf("\n");
     sub_pk(pks, pks, digest);
-    // printf("  (hidden as): "); print_pk(pks); printf("\n");
 
-    // printf("putting it in the %u-th place\n", index);
     // put the last group element in `index`-th place
     for (i = 0; i < OTKEM_N-1; i++) {
         swap &= (-(uint64_t)(i ^ index)) >> 63;
@@ -122,22 +84,16 @@ void kemot_sender(uint8_t sss[OTKEM_N * SS_BYTES],
     hash_id[SID_BYTES] = 0;
     hash_pks(digest, pk_pointers, hash_id);
     add_pk(pk, pks, digest);
-    // printf("  Sender encrypts s0 to: "); print_pk(pk); printf("\n");
     rc = OQS_KEM_kyber_768_encaps(cts, sss, pk);
     assert(rc == OQS_SUCCESS);
-    // printf("                     ct: "); print_ct(cts); printf("\n");
-    // printf("s0: "); print_ss(sss); printf("\n");
 
     for (i = 1; i < OTKEM_N; i++) {
         pk_pointers[i - 1] = &pks[(i - 1) * PK_BYTES];
         hash_id[SID_BYTES] = i;
         hash_pks(digest, pk_pointers, hash_id);
         add_pk(pk, &pks[i * PK_BYTES], digest);
-        // printf("  Sender encrypts s%zu to: ", i); print_pk(pk); printf("\n");
         rc = OQS_KEM_kyber_768_encaps(&cts[i * CT_BYTES], &sss[i * SS_BYTES], pk);
         assert(rc == OQS_SUCCESS);
-        // printf("                     ct: "); print_ct(&cts[i * CT_BYTES]); printf("\n");
-        // printf("s%zu: ", i); print_ss(&sss[i * SS_BYTES]); printf("\n");
     }
 }
 
@@ -164,74 +120,6 @@ void kemot_receiver_output(uint8_t ss[SS_BYTES],
         b = 1 - ((-(uint64_t)(i ^ index)) >> 63);
         cmov(ct, &cts[i * CT_BYTES], CT_BYTES, b);
     }
-    // printf("   Receiver decrypts "); print_ct(ct); printf("\n");
     rc = OQS_KEM_kyber_768_decaps(ss, ct, sk);
     assert(rc == OQS_SUCCESS);
-    // printf("Decrypted: "); print_ss(ss); printf("\n");
 }
-
-#if TEST_OT == 1
-
-#include <stdio.h>
-
-#define NTESTS 1
-
-static int eq(const uint8_t *x, const uint8_t *y, size_t len)
-{
-    size_t i;
-    for (i = 0; i < len; i++) {
-        if (x[i] != y[i]) {
-            // fprintf(stderr, "Differ at pos %zu: %02x != %02x\n", i, x[i], y[i]);
-            return 0;
-        }
-    }
-    return 1;
-}
-
-static void test_ot()
-{
-    uint8_t i, j;
-    uint8_t sid[SID_BYTES] = {0};
-    uint8_t recv_sk[SK_BYTES];
-    uint8_t recv_ss[SS_BYTES];
-    uint8_t send_sss[OTKEM_N * SS_BYTES];
-    uint8_t m0[OTKEM_N * PK_BYTES];
-    uint8_t m1[OTKEM_N * CT_BYTES];
-
-    for (i = 0; i < OTKEM_N; i++) {
-        kemot_receiver_init(recv_sk, m0, i, sid);
-        printf("OT msg 0:\n");
-        for (j = 0; j < OTKEM_N; j++) {
-            printf("  "); print_pk(&m0[j * PK_BYTES]); printf("\n"); 
-        }
-        kemot_sender(send_sss, m1, m0, sid);
-        kemot_receiver_output(recv_ss, m1, recv_sk, i);
-
-        assert(eq(&send_sss[i * SS_BYTES], recv_ss, SS_BYTES));
-
-        for (j = 0; j < OTKEM_N; j++) {
-            if (i == j) {
-                continue;
-            }
-            assert(!eq(&send_sss[j * SS_BYTES], recv_ss, SS_BYTES));
-        }
-        for (j = 0; j < OTKEM_N; j++) {
-            if (i == j) {
-                continue;
-            }
-            kemot_receiver_output(recv_ss, m1, recv_sk, j);
-            assert(!eq(&send_sss[j * SS_BYTES], recv_ss, SS_BYTES));
-        }
-    }
-}
-
-int main()
-{
-    size_t i;
-    for (i = 0; i < NTESTS; i++) {
-        test_ot();
-    }
-    return 0;
-}
-
-#endif
