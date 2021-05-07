@@ -1,7 +1,7 @@
 libkop
 ======
 
-KOP stands for (__K__EM-based __O__T)-based __P__ET,
+KOP stands for (*K*EM-based *O*T)-based *P*ET,
 which uses the following acronyms:
 - KEM: Key Encapsulation Mechanism
 - OT: Oblivious Transfer
