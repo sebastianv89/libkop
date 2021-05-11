@@ -39,11 +39,37 @@ static int test_with_inputs(const uint8_t a_x[PET_INPUT_BYTES], const uint8_t b_
     return 1;
 }
 
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+
+static int test_buffer_overlap(const uint8_t a_x[PET_INPUT_BYTES], const uint8_t b_y[PET_INPUT_BYTES]) {
+    uint8_t alice[MAX(PET_SIGMA * SK_BYTES, PET_LAMBDA)];
+    uint8_t bob[PET_LAMBDA + PET_SIGMA * SK_BYTES];
+    uint8_t msg[MAX(PET_SIGMA * OTKEM_N * (CT_BYTES + PK_BYTES), PET_LAMBDA + PET_SIGMA * OTKEM_N * CT_BYTES)];
+    uint8_t *bob_y_b = bob;
+    uint8_t *bob_sks = &bob[PET_LAMBDA];
+    int a_out, b_out;
+
+    pet_alice_m0(alice, msg, a_x);
+    pet_bob_m1(bob_y_b, bob_sks, msg, msg, b_y);
+    pet_alice_m2(alice, msg, msg, alice, a_x);
+    b_out = pet_bob_m3(msg, msg, bob_y_b, bob_sks, b_y);
+    if (!b_out) {
+        return 0;
+    }
+    a_out = pet_alice_accept(msg, alice);
+    if (!a_out) {
+        fprintf(stderr, "Alice did not accept while Bob did\n");
+        return 0;
+    }
+    return 1;
+}
+
 static void example_same_input()
 {
     uint8_t x[PET_INPUT_BYTES];
     randombytes(x, PET_INPUT_BYTES);
     assert(test_with_inputs(x, x));
+    assert(test_buffer_overlap(x, x));
 }
 
 static void example_different_input()
@@ -53,6 +79,7 @@ static void example_different_input()
     randombytes(x, PET_INPUT_BYTES);
     randombytes(y, PET_INPUT_BYTES);
     assert(!test_with_inputs(x, y));
+    assert(!test_buffer_overlap(x, y));
 }
 
 // Kyber768, σ=40, N=4
