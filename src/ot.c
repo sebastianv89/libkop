@@ -1,6 +1,5 @@
 #include <stddef.h>
 #include <stdint.h>
-#include <assert.h>
 
 #include <oqs/oqs.h>
 
@@ -29,7 +28,6 @@ void kemot_receiver_init(uint8_t sk[SK_BYTES],
     uint8_t digest[PK_BYTES];
     const uint8_t * pk_pointers[OTKEM_N - 1];
     uint8_t hash_id[HID_BYTES];
-    OQS_STATUS rc;
 
     for (i = 1; i < OTKEM_N; i++) {
         random_pk(&pks[i * PK_BYTES]);
@@ -40,8 +38,7 @@ void kemot_receiver_init(uint8_t sk[SK_BYTES],
     }
     hash_id[SID_BYTES] = index;
     hash_pks(digest, pk_pointers, hash_id);
-    rc = OQS_KEM_kyber_768_keypair(pks, sk);
-    assert(rc == OQS_SUCCESS);
+    OQS_KEM_kyber_768_keypair(pks, sk);
     sub_pk(pks, pks, digest);
 
     // put the last group element in `index`-th place
@@ -73,7 +70,6 @@ void kemot_sender(uint8_t sss[OTKEM_N * SS_BYTES],
     uint8_t digest[PK_BYTES];
     uint8_t hash_id[HID_BYTES];
     size_t i;
-    OQS_STATUS rc;
 
     for (i = 0; i < OTKEM_N - 1; i++) {
         pk_pointers[i] = &pks[(i + 1) * PK_BYTES];
@@ -84,16 +80,14 @@ void kemot_sender(uint8_t sss[OTKEM_N * SS_BYTES],
     hash_id[SID_BYTES] = 0;
     hash_pks(digest, pk_pointers, hash_id);
     add_pk(pk, pks, digest);
-    rc = OQS_KEM_kyber_768_encaps(cts, sss, pk);
-    assert(rc == OQS_SUCCESS);
+    OQS_KEM_kyber_768_encaps(cts, sss, pk);
 
     for (i = 1; i < OTKEM_N; i++) {
         pk_pointers[i - 1] = &pks[(i - 1) * PK_BYTES];
         hash_id[SID_BYTES] = i;
         hash_pks(digest, pk_pointers, hash_id);
         add_pk(pk, &pks[i * PK_BYTES], digest);
-        rc = OQS_KEM_kyber_768_encaps(&cts[i * CT_BYTES], &sss[i * SS_BYTES], pk);
-        assert(rc == OQS_SUCCESS);
+        OQS_KEM_kyber_768_encaps(&cts[i * CT_BYTES], &sss[i * SS_BYTES], pk);
     }
 }
 
@@ -114,12 +108,10 @@ void kemot_receiver_output(uint8_t ss[SS_BYTES],
     uint8_t ct[CT_BYTES];
     uint8_t b;
     size_t i;
-    OQS_STATUS rc;
 
     for (i = 0; i < OTKEM_N; i++) {
         b = 1 - ((-(uint64_t)(i ^ index)) >> 63);
         cmov(ct, &cts[i * CT_BYTES], CT_BYTES, b);
     }
-    rc = OQS_KEM_kyber_768_decaps(ss, ct, sk);
-    assert(rc == OQS_SUCCESS);
+    OQS_KEM_kyber_768_decaps(ss, ct, sk);
 }
