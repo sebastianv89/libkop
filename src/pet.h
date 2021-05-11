@@ -6,6 +6,9 @@
 
 #include "params.h"
 
+// not static: want to benchmark this, but this is not part of the api
+void pet_prf(uint8_t out[PET_LAMBDA], const uint8_t in[SS_BYTES + PET_INPUT_BYTES]);
+
 void pet_alice_m0(uint8_t sks[PET_SIGMA * SK_BYTES],
                   uint8_t pks[PET_SIGMA * OTKEM_N * PK_BYTES],
                   const uint8_t x[PET_INPUT_BYTES]);

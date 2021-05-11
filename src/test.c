@@ -27,7 +27,7 @@ static int test_with_inputs(const uint8_t a_x[PET_INPUT_BYTES], const uint8_t b_
     pet_alice_m0(a_sks, m0, a_x);
     pet_bob_m1(b_y_b, b_sks, m1, m0, b_y);
     pet_alice_m2(a_x_a, m2, m1, a_sks, a_x);
-    bob = pet_bob_m3(m3, m2, b_sks, b_y, b_y_b);
+    bob = pet_bob_m3(m3, m2, b_y_b, b_sks, b_y);
     if (!bob) {
         return 0;
     }
@@ -72,7 +72,7 @@ static void print_sizes()
 int main()
 {
     print_sizes();
-    for (size_t i = 0; i < 100; i++) {
+    for (size_t i = 0; i < 20; i++) {
         example_same_input();
         example_different_input();
     }
