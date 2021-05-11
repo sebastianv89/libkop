@@ -2,11 +2,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include <openssl/evp.h>
+
 #include "pet.h"
 #include "params.h"
 #include "common.h"
 #include "ot.h"
-#include "fips202.h"
 
 // Convert bytes to words of OTKEM_LOG_N bits
 static void bytes_to_words(uint8_t words[PET_SIGMA], const uint8_t bytes[PET_INPUT_BYTES])
@@ -98,7 +99,7 @@ void pet_bob_m1(uint8_t y_b[PET_LAMBDA],
             b = 1 - ((-(uint64_t)(j ^ indices[i])) >> 63);
             cmov(prf_input, &sss[j * SS_BYTES], SS_BYTES, b);
         }
-        sha3_256(digest, prf_input, SS_BYTES + PET_INPUT_BYTES);
+        EVP_Digest(prf_input, SS_BYTES + PET_INPUT_BYTES, digest, NULL, EVP_sha3_256(), NULL);
         for (j = 0; j < PET_LAMBDA; j++) {
             y_b[j] ^= digest[j];
         }
@@ -152,7 +153,7 @@ void pet_alice_m2(uint8_t x_a[PET_LAMBDA],
     bytes_to_words(indices, x);
     for (i = 0; i < PET_SIGMA; i++) {
         kemot_receiver_output(prf_input, &cts_in[i * OTKEM_N * CT_BYTES], &sks[i * SK_BYTES], indices[i]);
-        sha3_256(digest, prf_input, SS_BYTES + PET_INPUT_BYTES);
+        EVP_Digest(prf_input, SS_BYTES + PET_INPUT_BYTES, digest, NULL, EVP_sha3_256(), NULL);
         for (j = 0; j < PET_LAMBDA; j++) {
             x_b[j] ^= digest[j];
         }
@@ -168,7 +169,7 @@ void pet_alice_m2(uint8_t x_a[PET_LAMBDA],
             b = 1 - ((-(uint64_t)(j ^ indices[i])) >> 63);
             cmov(prf_input, &sss[j * SS_BYTES], SS_BYTES, b);
         }
-        sha3_256(digest, prf_input, SS_BYTES + PET_INPUT_BYTES);
+        EVP_Digest(prf_input, SS_BYTES + PET_INPUT_BYTES, digest, NULL, EVP_sha3_256(), NULL);
         for (j = 0; j < PET_LAMBDA; j++) {
             x_ab[j] ^= digest[j];
         }
@@ -219,7 +220,7 @@ int pet_bob_m3(uint8_t y_a[PET_LAMBDA],
     bytes_to_words(indices, y);
     for (i = 0; i < PET_SIGMA; i++) {
         kemot_receiver_output(prf_input, &cts_in[i * OTKEM_N * CT_BYTES], &sks[i * SK_BYTES], indices[i]);
-        sha3_256(digest, prf_input, SS_BYTES + PET_INPUT_BYTES);
+        EVP_Digest(prf_input, SS_BYTES + PET_INPUT_BYTES, digest, NULL, EVP_sha3_256(), NULL);
         for (j = 0; j < PET_LAMBDA; j++) {
             y_ab[j] ^= digest[j];
         }

@@ -1,9 +1,11 @@
 #include <stddef.h>
 #include <stdint.h>
+#include <assert.h>
+
+#include <openssl/evp.h>
 
 #include "group.h"
 #include "params.h"
-#include "fips202.h"
 #include "randombytes.h"
 
 ///////
@@ -205,15 +207,25 @@ static void polyvec_sub(polyvec *r, const polyvec *a, const polyvec *b)
 //
 // Adapted from the Crystals/Kyber subroutine `gen_matrix`.
 // Does not generate more than one polyvec.
-#define XOF_BLOCKBYTES SHAKE128_RATE
+// 
+// OpenSSL can't squeeze a XOF, so we apply a hack like liboqs does, cloning contexts
+// and dynamically allocating memory. (The overhead here could be worse than the gain
+// of using OpenSSL's optimized shake implementation)
+#define XOF_BLOCKBYTES 168
 #define GEN_POLYVEC_NBLOCKS ((12*KYBER_N/8*(1 << 12) / KYBER_Q + XOF_BLOCKBYTES)/XOF_BLOCKBYTES)
 static void gen_polyvec(polyvec *a, const uint8_t seed[SEED_BYTES])
 {
-    size_t ctr, i, j;
-    size_t buflen, off;
+    size_t ctr, i, squeeze_len;
+    size_t buflen;
     uint8_t extseed[SEED_BYTES + 1];
-    uint8_t buf[GEN_POLYVEC_NBLOCKS * XOF_BLOCKBYTES + 2];
-    shake128ctx state;
+    uint8_t *buf;
+    EVP_MD_CTX *ctx, *ctx_clone;
+
+    ctx = EVP_MD_CTX_new();
+    ctx_clone = EVP_MD_CTX_new();
+    buflen = GEN_POLYVEC_NBLOCKS * XOF_BLOCKBYTES;
+    buf = malloc(buflen);
+    assert(buf != NULL);
 
     for (i = 0; i < SEED_BYTES; i++) {
         extseed[i] = seed[i];
@@ -221,21 +233,29 @@ static void gen_polyvec(polyvec *a, const uint8_t seed[SEED_BYTES])
 
     for (i = 0; i < KYBER_K; i++) {
         extseed[SEED_BYTES] = (uint8_t)i;
-        shake128_absorb(&state, extseed, sizeof(extseed));
-        shake128_squeezeblocks(buf, GEN_POLYVEC_NBLOCKS, &state);
-        buflen = GEN_POLYVEC_NBLOCKS * XOF_BLOCKBYTES;
+        EVP_DigestInit_ex(ctx, EVP_shake128(), NULL);
+        EVP_DigestUpdate(ctx, extseed, sizeof(extseed));
+        EVP_DigestInit_ex(ctx_clone, EVP_shake128(), NULL);
+        EVP_MD_CTX_copy_ex(ctx_clone, ctx);
+        EVP_DigestFinalXOF(ctx_clone, buf, GEN_POLYVEC_NBLOCKS * XOF_BLOCKBYTES);
         ctr = rej_uniform(a->vec[i].coeffs, KYBER_N, buf, buflen);
+        squeeze_len = (buflen / 3) * 3;
 
         while(ctr < KYBER_N) {
-            off = buflen % 3;
-            for(j = 0; j < off; j++) {
-                buf[j] = buf[buflen - off + j];
-            }
-            shake128_squeezeblocks(buf + off, 1, &state);
-            buflen = off + XOF_BLOCKBYTES;
-            ctr += rej_uniform(a->vec[i].coeffs + ctr, KYBER_N - ctr, buf, buflen);
+            free(buf);
+            buflen += XOF_BLOCKBYTES;
+            buf = malloc(buflen);
+            assert(buf != NULL);
+            EVP_DigestInit_ex(ctx_clone, EVP_shake128(), NULL);
+            EVP_MD_CTX_copy_ex(ctx_clone, ctx);
+            EVP_DigestFinalXOF(ctx_clone, buf, buflen);
+            ctr += rej_uniform(a->vec[i].coeffs + ctr, KYBER_N - ctr, buf + squeeze_len, buflen - squeeze_len);
+            squeeze_len = (buflen / 3) * 3;
         }
     }
+    free(buf);
+    EVP_MD_CTX_free(ctx);
+    EVP_MD_CTX_free(ctx_clone);
 }
 
 /// r = a + b
@@ -315,16 +335,18 @@ void random_pk(uint8_t pk[PK_BYTES])
 /// @param[in]  hid  unique identifier to ensure domain seperation (of length HID_BYTES)
 void hash_pks(uint8_t pk[PK_BYTES], const uint8_t * const pks[OTKEM_N - 1], const uint8_t hid[HID_BYTES])
 {
-    sha3_512incctx state;
+    EVP_MD_CTX *ctx;
     uint8_t seed[2 * SEED_BYTES];
     size_t i;
 
-    sha3_512_inc_init(&state);
-    sha3_512_inc_absorb(&state, hid, HID_BYTES);
+    ctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(ctx, EVP_sha3_512(), NULL);
+    EVP_DigestUpdate(ctx, hid, HID_BYTES);
     for (i = 0; i < OTKEM_N - 1; i++) {
-        sha3_512_inc_absorb(&state, pks[i], PK_BYTES);
+        EVP_DigestUpdate(ctx, pks[i], PK_BYTES);
     }
-    sha3_512_inc_finalize(seed, &state);
+    EVP_DigestFinal_ex(ctx, seed, NULL);
     gen_pk(pk, seed);
+    EVP_MD_CTX_free(ctx);
 }
 

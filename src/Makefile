@@ -5,8 +5,8 @@ LIBS = -lcrypto -loqs
 RM = /bin/rm
 
 LIB = libkop.a
-HEADERS = params.h group.h ot.h pet.h common.h randombytes.h fips202.h 
-OBJECTS = group.o ot.o pet.o common.o randombytes.o fips202.o 
+HEADERS = params.h group.h ot.h pet.h common.h randombytes.h
+OBJECTS = group.o ot.o pet.o common.o randombytes.o
 
 $(LIB): $(OBJECTS)
 	$(AR) -r $@ $^
