@@ -1,8 +1,10 @@
 CC ?= /usr/bin/cc
-CFLAGS += -O3 -march=native -fomit-frame-pointer \
+CFLAGS += -O3 -DNDEBUG -march=native -fomit-frame-pointer \
 	  -Wall -Wextra -Wmissing-prototypes -Wredundant-decls -Wshadow -Wpointer-arith
 LIBS = -lcrypto -loqs
 RM = /bin/rm
+TESTFLAGS = -g -O0 -UNDEBUG -march=native \
+	    -Wall -Wextra -Wmissing-prototypes -Wredundant-decls -Wshadow -Wpointer-arith
 
 LIB = libkop.a
 HEADERS = params.h group.h ot.h pet.h common.h randombytes.h
@@ -15,12 +17,15 @@ $(LIB): $(OBJECTS)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 test: $(LIB)
-	$(CC) test.c $(CFLAGS) -o $@ $^ -lm $(LIBS) $(LIB)
+	$(CC) $(TESTFLAGS) -o $@ test.c $^ $(LIBS) $(LIB)
+
+test_speed: test_speed.c group.c ot.c pet.c common.c randombytes.c
+	$(CC) $(CFLAGS) -o $@ $^ -lm -lcrypto -loqs
 
 .PHONY: clean
 
 clean:
 	-$(RM) $(OBJECTS)
 	-$(RM) $(LIB)
-	-$(RM) ./test
+	-$(RM) ./test ./test_speed
 

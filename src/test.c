@@ -8,8 +8,6 @@
 #include "params.h"
 #include "randombytes.h"
 
-#include "ds_benchmark.h"
-
 static int test_with_inputs(const uint8_t a_x[PET_INPUT_BYTES], const uint8_t b_y[PET_INPUT_BYTES])
 {
     uint8_t a_sks[PET_SIGMA * SK_BYTES];
@@ -71,49 +69,6 @@ static void print_sizes()
     printf("M3, B -> A: %8u bytes (encoding)\n", PET_LAMBDA);
 }
 
-
-// Started at 2021-05-07 14:11:36
-// Operation                      | Iterations | Total time (s) | Time (us): mean | pop. stdev | CPU cycles: mean          | pop. stdev
-// ------------------------------ | ----------:| --------------:| ---------------:| ----------:| -------------------------:| ----------:
-// pet_alice_m0                   |       1000 |         12.844 |       12843.857 |    760.072 |                  23118696 |    1368104
-// pet_bob_m1                     |       1000 |         46.401 |       46401.005 |   1101.628 |                  83521427 |    1982916
-// pet_alice_m2                   |       1000 |         36.123 |       36122.741 |     40.635 |                  65020699 |      73092
-// pet_bob_m3                     |       1000 |          2.383 |        2383.034 |     15.363 |                   4289077 |      27635
-// pet_alice_accept               |       1000 |          0.000 |           0.123 |      0.328 |                        60 |          7
-// Ended at 2021-05-07 14:13:14
-//
-static void measure_timing()
-{
-    uint8_t a_x[PET_INPUT_BYTES];
-    uint8_t a_sks[PET_SIGMA * SK_BYTES];
-    uint8_t a_x_a[PET_LAMBDA];
-
-    uint8_t b_y[PET_INPUT_BYTES];
-    uint8_t b_sks[PET_SIGMA * SK_BYTES];
-    uint8_t b_y_b[PET_SIGMA * SK_BYTES];
-
-    uint8_t m0[PET_SIGMA * OTKEM_N * PK_BYTES];
-    uint8_t m1[PET_SIGMA * OTKEM_N * (CT_BYTES + PK_BYTES)];
-    uint8_t m2[PET_LAMBDA + PET_SIGMA * OTKEM_N * CT_BYTES];
-    uint8_t m3[PET_LAMBDA];
-
-    size_t j;
-
-    randombytes(a_x, PET_INPUT_BYTES);
-    for (j = 0; j < PET_INPUT_BYTES; j++) {
-        b_y[j] = a_x[j];
-    }
-
-    PRINT_TIMER_HEADER
-    TIME_OPERATION_ITERATIONS(pet_alice_m0(a_sks, m0, a_x), "pet_alice_m0", 1000)
-    TIME_OPERATION_ITERATIONS(pet_bob_m1(b_y_b, b_sks, m1, m0, b_y), "pet_bob_m1", 1000)
-    TIME_OPERATION_ITERATIONS(pet_alice_m2(a_x_a, m2, m1, a_sks, a_x), "pet_alice_m2", 1000)
-    TIME_OPERATION_ITERATIONS(pet_bob_m3(m3, m2, b_sks, b_y, b_y_b), "pet_bob_m3", 1000)
-    TIME_OPERATION_ITERATIONS(pet_alice_accept(m3, a_x_a), "pet_alice_accept", 1000)
-    PRINT_TIMER_FOOTER
-}
-
-
 int main()
 {
     print_sizes();
@@ -121,6 +76,5 @@ int main()
         example_same_input();
         example_different_input();
     }
-    measure_timing();
 }
 
