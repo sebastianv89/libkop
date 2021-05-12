@@ -10,108 +10,100 @@
 
 /// Initialize the OT Receiver
 ///
-/// Initatialize the 1-out-of-n OT Receiver (where n=OTKEM_N).  Provides a
+/// Initatialize the 1-out-of-n OT Receiver (where n=KOP_OT_N).  Provides a
 /// secret key for the Receiver and n public keys that make up the message to
 /// the Sender.
 ///
-/// @param[out] sk     secret key, of length SK_BYTES
-/// @param[out] pks    OTKEM_N public keys, of length PK_BYTES each. Outgoing message to Sender.
-/// @param[in]  index  secret index, requires 0<=index<OTKEM_N
-/// @param[in]  sid    unique session id, of length SID_BYTES
-void kemot_receiver_init(uint8_t sk[SK_BYTES],
-                         uint8_t pks[OTKEM_N * PK_BYTES],
+/// @param[out]     sk     secret key, of length KOP_SK_BYTES
+/// @param[out]     pks    KOP_OT_N public keys, of length KOP_PK_BYTES each. Outgoing message to Sender.
+/// @param[in]      index  secret index, requires 0<=index<KOP_OT_N
+/// @param[in]      hid    unique hash id
+void kemot_receiver_init(uint8_t sk[KOP_SK_BYTES],
+                         uint8_t pks[KOP_OT_MSG0_BYTES],
                          uint8_t index,
-                         const uint8_t sid[SID_BYTES])
+                         hid_t *hid)
 {
     size_t i;
     uint8_t swap = 1;
-    uint8_t digest[PK_BYTES];
-    const uint8_t * pk_pointers[OTKEM_N - 1];
-    uint8_t hash_id[HID_BYTES];
+    uint8_t digest[KOP_PK_BYTES];
+    const uint8_t * pk_pointers[KOP_OT_N - 1];
 
-    for (i = 1; i < OTKEM_N; i++) {
-        random_pk(&pks[i * PK_BYTES]);
-        pk_pointers[i-1] = &pks[i * PK_BYTES];
+    for (i = 1; i < KOP_OT_N; i++) {
+        random_pk(&pks[i * KOP_PK_BYTES]);
+        pk_pointers[i-1] = &pks[i * KOP_PK_BYTES];
     }
-    for (i = 0; i < SID_BYTES; i++) {
-        hash_id[i] = sid[i];
-    }
-    hash_id[SID_BYTES] = index;
-    hash_pks(digest, pk_pointers, hash_id);
+    hid->kem = index;
+    hash_pks(digest, pk_pointers, hid);
     OQS_KEM_kyber_768_keypair(pks, sk);
     sub_pk(pks, pks, digest);
 
     // put the last group element in `index`-th place
-    for (i = 0; i < OTKEM_N-1; i++) {
+    for (i = 0; i < KOP_OT_N-1; i++) {
         swap &= (-(uint64_t)(i ^ index)) >> 63;
-        cswap(&pks[i * PK_BYTES], &pks[(i + 1) * PK_BYTES], PK_BYTES, swap);
+        cswap(&pks[i * KOP_PK_BYTES], &pks[(i + 1) * KOP_PK_BYTES], KOP_PK_BYTES, swap);
     }
 }
 
 /// Run the OT Sender
 ///
-/// Run the 1-out-of-n OT Sender (where n=OTKEM_N). Provides n random OT
+/// Run the 1-out-of-n OT Sender (where n=KOP_OT_N). Provides n random OT
 /// messages (shared secrets) to the Sender and n ciphertexts for the Receiver (so they can
 /// decrypt only one of their choice).
 ///
 /// @warning Buffers MUST NOT overlap.
 ///
-/// @param[out] sss  OTKEM_N shared secrets, of length SS_BYTES each
-/// @param[out] cts  OTKEM_N ciphertexts, of length CT_BYTES each. Outgoing message to Receiver.
-/// @param[in]  pks  OTKEM_N public keys, of length PK_BYTES each. Incoming message from Receiver.
-/// @param[in]  sid  unique session id, of length SID_BYTES
-void kemot_sender(uint8_t sss[OTKEM_N * SS_BYTES],
-                  uint8_t cts[OTKEM_N * CT_BYTES],
-                  const uint8_t pks[OTKEM_N * PK_BYTES],
-                  const uint8_t sid[SID_BYTES])
+/// @param[out] sss  KOP_OT_N shared secrets, of length KOP_SS_BYTES each
+/// @param[out] cts  KOP_OT_N ciphertexts, of length KOP_CT_BYTES each. Outgoing message to Receiver.
+/// @param[in]  pks  KOP_OT_N public keys, of length KOP_PK_BYTES each. Incoming message from Receiver.
+/// @param[in]  sid  unique session id, of length KOP_SID_BYTES
+void kemot_sender(uint8_t sss[KOP_OT_N * KOP_SS_BYTES],
+                  uint8_t cts[KOP_OT_MSG1_BYTES],
+                  const uint8_t pks[KOP_OT_MSG0_BYTES],
+                  hid_t *hid)
 {
-    uint8_t pk[PK_BYTES];
-    const uint8_t * pk_pointers[OTKEM_N - 1];
-    uint8_t digest[PK_BYTES];
-    uint8_t hash_id[HID_BYTES];
+    uint8_t pk[KOP_PK_BYTES];
+    const uint8_t * pk_pointers[KOP_OT_N - 1];
+    uint8_t digest[KOP_PK_BYTES];
     size_t i;
 
-    for (i = 0; i < OTKEM_N - 1; i++) {
-        pk_pointers[i] = &pks[(i + 1) * PK_BYTES];
+    for (i = 0; i < KOP_OT_N - 1; i++) {
+        pk_pointers[i] = &pks[(i + 1) * KOP_PK_BYTES];
     }
-    for (i = 0; i < SID_BYTES; i++) {
-        hash_id[i] = sid[i];
-    }
-    hash_id[SID_BYTES] = 0;
-    hash_pks(digest, pk_pointers, hash_id);
+    hid->kem = 0;
+    hash_pks(digest, pk_pointers, hid);
     add_pk(pk, pks, digest);
     OQS_KEM_kyber_768_encaps(cts, sss, pk);
 
-    for (i = 1; i < OTKEM_N; i++) {
-        pk_pointers[i - 1] = &pks[(i - 1) * PK_BYTES];
-        hash_id[SID_BYTES] = i;
-        hash_pks(digest, pk_pointers, hash_id);
-        add_pk(pk, &pks[i * PK_BYTES], digest);
-        OQS_KEM_kyber_768_encaps(&cts[i * CT_BYTES], &sss[i * SS_BYTES], pk);
+    for (i = 1; i < KOP_OT_N; i++) {
+        pk_pointers[i - 1] = &pks[(i - 1) * KOP_PK_BYTES];
+        hid->kem = i;
+        hash_pks(digest, pk_pointers, hid);
+        add_pk(pk, &pks[i * KOP_PK_BYTES], digest);
+        OQS_KEM_kyber_768_encaps(&cts[i * KOP_CT_BYTES], &sss[i * KOP_SS_BYTES], pk);
     }
 }
 
 /// Finalize the OT Receiver
 ///
-/// Finalize the 1-out-of-n OT Receiver (where n=OTKEM_N). Decapsulate the shared secret
+/// Finalize the 1-out-of-n OT Receiver (where n=KOP_OT_N). Decapsulate the shared secret
 /// sent in cts[index], using the sk generated in `kemot_receiver_init`.
 ///
-/// @param[out] ss     shared secret, of length SS_BYTES
-/// @param[in]  cts    OTKEM_N ciphertexts, of length CT_BYTES each. Incoming message from Receiver.
-/// @param[in]  sk     secret key, of length SK_BYTES. Generated by `kemot_receiver_init`.
+/// @param[out] ss     shared secret, of length KOP_SS_BYTES
+/// @param[in]  cts    KOP_OT_N ciphertexts, of length KOP_CT_BYTES each. Incoming message from Receiver.
+/// @param[in]  sk     secret key, of length KOP_SK_BYTES. Generated by `kemot_receiver_init`.
 /// @param[in]  index  secret index. Must be equal to index passed to `kemot_receiver_init`.
-void kemot_receiver_output(uint8_t ss[SS_BYTES],
-                           const uint8_t cts[OTKEM_N * CT_BYTES],
-                           const uint8_t sk[SK_BYTES],
+void kemot_receiver_output(uint8_t ss[KOP_SS_BYTES],
+                           const uint8_t cts[KOP_OT_MSG1_BYTES],
+                           const uint8_t sk[KOP_SK_BYTES],
                            uint8_t index)
 {
-    uint8_t ct[CT_BYTES];
+    uint8_t ct[KOP_CT_BYTES];
     uint8_t b;
     size_t i;
 
-    for (i = 0; i < OTKEM_N; i++) {
+    for (i = 0; i < KOP_OT_N; i++) {
         b = 1 - ((-(uint64_t)(i ^ index)) >> 63);
-        cmov(ct, &cts[i * CT_BYTES], CT_BYTES, b);
+        cmov(ct, &cts[i * KOP_CT_BYTES], KOP_CT_BYTES, b);
     }
     OQS_KEM_kyber_768_decaps(ss, ct, sk);
 }

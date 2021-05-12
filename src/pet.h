@@ -6,32 +6,37 @@
 
 #include "params.h"
 
-// not static: want to benchmark this, but this is not part of the api
-void pet_prf(uint8_t out[PET_LAMBDA], const uint8_t in[SS_BYTES + PET_INPUT_BYTES]);
+// TODO work with structs instead of concatenated byte-arrays
 
-void pet_alice_m0(uint8_t sks[PET_SIGMA * SK_BYTES],
-                  uint8_t pks[PET_SIGMA * OTKEM_N * PK_BYTES],
-                  const uint8_t x[PET_INPUT_BYTES]);
+// not static: want to benchmark this, but this is not part of the API
+void pet_prf(uint8_t out[KOP_PRF_BYTES], const uint8_t in[KOP_SS_BYTES + KOP_INPUT_BYTES]);
 
-void pet_bob_m1(uint8_t y_b[PET_LAMBDA],
-                uint8_t sks[PET_SIGMA * SK_BYTES],
-                uint8_t msg_out[PET_SIGMA * OTKEM_N * (CT_BYTES + PK_BYTES)],
-                const uint8_t pks_in[PET_SIGMA * OTKEM_N * PK_BYTES],
-                const uint8_t y[PET_INPUT_BYTES]);
+void pet_alice_m0(uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+                  uint8_t pks[KOP_PET_MSG0_BYTES],
+                  const uint8_t x[KOP_INPUT_BYTES],
+                  const uint8_t sid[KOP_SID_BYTES]);
 
-void pet_alice_m2(uint8_t x_a[PET_LAMBDA],
-                 uint8_t msg_out[PET_LAMBDA + PET_SIGMA * OTKEM_N * CT_BYTES],
-                 const uint8_t msg_in[PET_SIGMA * OTKEM_N * (CT_BYTES + PK_BYTES)],
-                 const uint8_t sks[PET_SIGMA * SK_BYTES],
-                 const uint8_t x[PET_INPUT_BYTES]);
+void pet_bob_m1(uint8_t y_b[KOP_PRF_BYTES],
+                uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+                uint8_t msg_out[KOP_PET_MSG2_BYTES],
+                const uint8_t pks_in[KOP_PET_MSG1_BYTES],
+                const uint8_t y[KOP_INPUT_BYTES],
+                const uint8_t sid[KOP_SID_BYTES]);
 
-int pet_bob_m3(uint8_t y_a[PET_LAMBDA],
-               const uint8_t msg_in[PET_LAMBDA + PET_SIGMA * CT_BYTES],
-               const uint8_t sks[PET_SIGMA * SK_BYTES],
-               const uint8_t y[PET_INPUT_BYTES],
-               const uint8_t y_b[PET_LAMBDA]);
+void pet_alice_m2(uint8_t x_a[KOP_PRF_BYTES],
+                  uint8_t msg_out[KOP_PET_MSG2_BYTES],
+                  const uint8_t msg_in[KOP_PET_MSG1_BYTES],
+                  const uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+                  const uint8_t x[KOP_INPUT_BYTES],
+                  const uint8_t sid[KOP_SID_BYTES]);
 
-int pet_alice_accept(const uint8_t y_a[PET_LAMBDA],
-                     const uint8_t x_a[PET_LAMBDA]);
+int pet_bob_m3(uint8_t y_a[KOP_PET_MSG3_BYTES],
+               const uint8_t msg_in[KOP_PET_MSG2_BYTES],
+               const uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+               const uint8_t y[KOP_INPUT_BYTES],
+               const uint8_t y_b[KOP_PRF_BYTES]);
+
+int pet_alice_accept(const uint8_t y_a[KOP_PET_MSG3_BYTES],
+                     const uint8_t x_a[KOP_PRF_BYTES]);
 
 #endif

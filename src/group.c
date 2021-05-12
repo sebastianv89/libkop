@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <assert.h>
 
 #include <openssl/evp.h>
@@ -138,7 +139,7 @@ static void polyvec_add(polyvec *r, const polyvec *a, const polyvec *b)
 }
 
 // Serialize vector of polynomials and seed into bytes.
-static void pack_pk(uint8_t r[PK_BYTES],
+static void pack_pk(uint8_t r[KOP_PK_BYTES],
                     polyvec *pk,
                     const uint8_t seed[KYBER_SYMBYTES])
 {
@@ -153,7 +154,7 @@ static void pack_pk(uint8_t r[PK_BYTES],
 // De-serialize vector of polynomials and seed from bytes.
 static void unpack_pk(polyvec *pk,
                       uint8_t seed[KYBER_SYMBYTES],
-                      const uint8_t packedpk[PK_BYTES])
+                      const uint8_t packedpk[KOP_PK_BYTES])
 {
     size_t i;
 
@@ -213,11 +214,11 @@ static void polyvec_sub(polyvec *r, const polyvec *a, const polyvec *b)
 // of using OpenSSL's optimized shake implementation)
 #define XOF_BLOCKBYTES 168
 #define GEN_POLYVEC_NBLOCKS ((12*KYBER_N/8*(1 << 12) / KYBER_Q + XOF_BLOCKBYTES)/XOF_BLOCKBYTES)
-static void gen_polyvec(polyvec *a, const uint8_t seed[SEED_BYTES])
+static void gen_polyvec(polyvec *a, const uint8_t seed[KYBER_SYMBYTES])
 {
     size_t ctr, i, squeeze_len;
     size_t buflen;
-    uint8_t extseed[SEED_BYTES + 1];
+    uint8_t extseed[KYBER_SYMBYTES + 1];
     uint8_t *buf;
     EVP_MD_CTX *ctx, *ctx_clone;
 
@@ -227,12 +228,12 @@ static void gen_polyvec(polyvec *a, const uint8_t seed[SEED_BYTES])
     buf = malloc(buflen);
     assert(buf != NULL);
 
-    for (i = 0; i < SEED_BYTES; i++) {
+    for (i = 0; i < KYBER_SYMBYTES; i++) {
         extseed[i] = seed[i];
     }
 
     for (i = 0; i < KYBER_K; i++) {
-        extseed[SEED_BYTES] = (uint8_t)i;
+        extseed[KYBER_SYMBYTES] = (uint8_t)i;
         EVP_DigestInit_ex(ctx, EVP_shake128(), NULL);
         EVP_DigestUpdate(ctx, extseed, sizeof(extseed));
         EVP_DigestInit_ex(ctx_clone, EVP_shake128(), NULL);
@@ -262,10 +263,10 @@ static void gen_polyvec(polyvec *a, const uint8_t seed[SEED_BYTES])
 ///
 /// Group addition of public keys
 ///
-/// @param[out] r  resulting sum (of length PK_BYTES)
-/// @param[in]  a  first sum input (of length PK_BYTES)
-/// @param[in]  b  second sum input (of length PK_BYTES)
-void add_pk(uint8_t r[PK_BYTES], const uint8_t a[PK_BYTES], const uint8_t b[PK_BYTES])
+/// @param[out] r  resulting sum (of length KOP_PK_BYTES)
+/// @param[in]  a  first sum input (of length KOP_PK_BYTES)
+/// @param[in]  b  second sum input (of length KOP_PK_BYTES)
+void add_pk(uint8_t r[KOP_PK_BYTES], const uint8_t a[KOP_PK_BYTES], const uint8_t b[KOP_PK_BYTES])
 {
     size_t i;
     polyvec ta, tb;
@@ -285,10 +286,10 @@ void add_pk(uint8_t r[PK_BYTES], const uint8_t a[PK_BYTES], const uint8_t b[PK_B
 ///
 /// Group subtraction of public keys
 ///
-/// @param[out] r  resulting difference (of length PK_BYTES)
-/// @param[in]  a  minuend (of length PK_BYTES)
-/// @param[in]  b  subtrahend (of length PK_BYTES)
-void sub_pk(uint8_t r[PK_BYTES], const uint8_t a[PK_BYTES], const uint8_t b[PK_BYTES])
+/// @param[out] r  resulting difference (of length KOP_PK_BYTES)
+/// @param[in]  a  minuend (of length KOP_PK_BYTES)
+/// @param[in]  b  subtrahend (of length KOP_PK_BYTES)
+void sub_pk(uint8_t r[KOP_PK_BYTES], const uint8_t a[KOP_PK_BYTES], const uint8_t b[KOP_PK_BYTES])
 {
     size_t i;
     polyvec ta, tb;
@@ -305,24 +306,24 @@ void sub_pk(uint8_t r[PK_BYTES], const uint8_t a[PK_BYTES], const uint8_t b[PK_B
 }
 
 // Expand a seed into a public key: generate polynomial
-static void gen_pk(uint8_t pk[PK_BYTES], const uint8_t seed[2 * SEED_BYTES])
+static void gen_pk(uint8_t pk[KOP_PK_BYTES], const uint8_t seed[2 * KYBER_SYMBYTES])
 {
     polyvec a;
 
     gen_polyvec(&a, seed);
-    pack_pk(pk, &a, &seed[SEED_BYTES]);
+    pack_pk(pk, &a, &seed[KYBER_SYMBYTES]);
 }
 
 /// Generate a random public key
 ///
 /// Generates a random seed, then expands that into a public key.
 ///
-/// @param[out] pk resulting public key (of length PK_BYTES)
-void random_pk(uint8_t pk[PK_BYTES])
+/// @param[out] pk resulting public key (of length KOP_PK_BYTES)
+void random_pk(uint8_t pk[KOP_PK_BYTES])
 {
-    uint8_t seed[2 * SEED_BYTES];
+    uint8_t seed[2 * KYBER_SYMBYTES];
 
-    randombytes(seed, 2 * SEED_BYTES);
+    randombytes(seed, 2 * KYBER_SYMBYTES);
     gen_pk(pk, seed);
 }
 
@@ -330,20 +331,25 @@ void random_pk(uint8_t pk[PK_BYTES])
 ///
 /// Hashes input public keys to a seed, then generates a new public key from that seed.
 ///
-/// @param[out] pk   resulting public key (of length PK_BYTES)
-/// @param[in]  pks  (OTKEM_N - 1) public keys (each of length PK_BYTES)
-/// @param[in]  hid  unique identifier to ensure domain seperation (of length HID_BYTES)
-void hash_pks(uint8_t pk[PK_BYTES], const uint8_t * const pks[OTKEM_N - 1], const uint8_t hid[HID_BYTES])
+/// @param[out] pk   resulting public key (of length KOP_PK_BYTES)
+/// @param[in]  pks  (KOP_OT_N - 1) public keys (each of length KOP_PK_BYTES)
+/// @param[in]  hid  unique identifier, ensures domain separation
+void hash_pks(uint8_t pk[KOP_PK_BYTES], const uint8_t * const pks[KOP_OT_N - 1], const hid_t *hid)
 {
     EVP_MD_CTX *ctx;
-    uint8_t seed[2 * SEED_BYTES];
+    uint8_t seed[2 * KYBER_SYMBYTES];
+    uint8_t hid_buf[KOP_SID_BYTES + 3];
     size_t i;
 
+    memcpy(hid_buf, hid->sid, KOP_SID_BYTES);
+    hid_buf[KOP_SID_BYTES    ] = hid->oenc;
+    hid_buf[KOP_SID_BYTES + 1] = hid->ot;
+    hid_buf[KOP_SID_BYTES + 2] = hid->kem;
     ctx = EVP_MD_CTX_new();
     EVP_DigestInit_ex(ctx, EVP_sha3_512(), NULL);
-    EVP_DigestUpdate(ctx, hid, HID_BYTES);
-    for (i = 0; i < OTKEM_N - 1; i++) {
-        EVP_DigestUpdate(ctx, pks[i], PK_BYTES);
+    EVP_DigestUpdate(ctx, hid_buf, KOP_SID_BYTES + 3);
+    for (i = 0; i < KOP_OT_N - 1; i++) {
+        EVP_DigestUpdate(ctx, pks[i], KOP_PK_BYTES);
     }
     EVP_DigestFinal_ex(ctx, seed, NULL);
     gen_pk(pk, seed);
