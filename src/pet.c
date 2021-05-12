@@ -11,7 +11,7 @@
 #include "ot.h"
 
 // Convert bytes to words of OTKEM_LOG_N bits
-static void bytes_to_words(uint8_t words[PET_SIGMA], const uint8_t bytes[PET_INPUT_BYTES])
+static void words_from_bytes(uint8_t words[PET_SIGMA], const uint8_t bytes[PET_INPUT_BYTES])
 {
 #if OTKEM_N != 4
     // TODO write general implementation
@@ -121,7 +121,7 @@ void pet_alice_m0(uint8_t sks[PET_SIGMA * SK_BYTES],
     uint8_t indices[PET_SIGMA];
     uint8_t sid[SID_BYTES] = {0};
 
-    bytes_to_words(indices, x);
+    words_from_bytes(indices, x);
     oenc_recv_init(sks, pks, indices, sid);
 }
 
@@ -155,7 +155,7 @@ void pet_bob_m1(uint8_t y_b[PET_LAMBDA],
     uint8_t sid[SID_BYTES] = {0};
 
     memcpy(y_local, y, PET_INPUT_BYTES);
-    bytes_to_words(indices, y);
+    words_from_bytes(indices, y);
     oenc_send(y_b_local, cts, pks_in, indices, y, sid);
     sid[SID_BYTES - 2] = 1;
     oenc_recv_init(sks, pks_out, indices, sid);
@@ -193,7 +193,7 @@ void pet_alice_m2(uint8_t x_a[PET_LAMBDA],
     const uint8_t *pks_in = &msg_in[PET_SIGMA * OTKEM_N * CT_BYTES];
     size_t i;
 
-    bytes_to_words(indices, x);
+    words_from_bytes(indices, x);
     oenc_recv_out(x_b, cts_in, sks, indices, x);
     oenc_send(x_a_local, cts_out, pks_in, indices, x, sid);
 
@@ -234,7 +234,7 @@ int pet_bob_m3(uint8_t y_a[PET_LAMBDA],
     const uint8_t *cts_in = &msg_in[PET_LAMBDA];
     size_t i;
 
-    bytes_to_words(indices, y);
+    words_from_bytes(indices, y);
     oenc_recv_out(y_a_local, cts_in, sks, indices, y);
     for (i = 0; i < PET_LAMBDA; i++) {
         y_ab[i] = y_a_local[i] ^ y_b[i];
