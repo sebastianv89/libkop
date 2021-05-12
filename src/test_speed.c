@@ -5,6 +5,7 @@
 #include <assert.h>
 
 #include "group.h"
+#include "ot.h"
 #include "pet.h"
 #include "params.h"
 #include "randombytes.h"
@@ -25,6 +26,14 @@ static void measure_timing()
     uint8_t m1[PET_SIGMA * OTKEM_N * (CT_BYTES + PK_BYTES)];
     uint8_t m2[PET_LAMBDA + PET_SIGMA * OTKEM_N * CT_BYTES];
     uint8_t m3[PET_LAMBDA];
+
+    uint8_t ot_sk[SK_BYTES];
+    uint8_t ot_ss[SS_BYTES];
+    uint8_t ot_pks[OTKEM_N * PK_BYTES];
+    uint8_t ot_sss[OTKEM_N * SS_BYTES];
+    uint8_t ot_cts[OTKEM_N * CT_BYTES];
+    uint8_t ot_sid[SID_BYTES] = {0};
+    uint8_t ot_index = 0;
 
     uint8_t a[PK_BYTES];
     uint8_t b[PK_BYTES];
@@ -55,6 +64,10 @@ static void measure_timing()
     TIME_OPERATION_ITERATIONS(pet_alice_m2(a_x_a, m2, m1, a_sks, a_x), "pet_alice_m2", 1000)
     TIME_OPERATION_ITERATIONS(pet_bob_m3(m3, m2, b_sks, b_y, b_y_b), "pet_bob_m3", 1000)
     TIME_OPERATION_ITERATIONS(pet_alice_accept(m3, a_x_a), "pet_alice_accept", 1000)
+
+    TIME_OPERATION_ITERATIONS(kemot_receiver_init(ot_sk, ot_pks, ot_index, ot_sid), "ot_recv_init", 1000)
+    TIME_OPERATION_ITERATIONS(kemot_sender(ot_sss, ot_cts, ot_pks, ot_sid), "ot_send", 1000)
+    TIME_OPERATION_ITERATIONS(kemot_receiver_output(ot_ss, ot_cts, ot_sk, ot_index), "ot_recv_out", 1000)
 
     TIME_OPERATION_ITERATIONS(add_pk(a, a, b), "add_pk", 1000)
     TIME_OPERATION_ITERATIONS(sub_pk(a, a, b), "sub_pk", 1000)
