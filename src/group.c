@@ -7,7 +7,6 @@
 
 #include "group.h"
 #include "params.h"
-#include "randombytes.h"
 
 ///////
 /// The following is mostly duplicated from Crystals/Kyber768 code.

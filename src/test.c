@@ -6,7 +6,6 @@
 
 #include "pet.h"
 #include "params.h"
-#include "randombytes.h"
 
 #define XSTR(s) STR(s)
 #define STR(s) #s

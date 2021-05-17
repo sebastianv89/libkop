@@ -9,7 +9,6 @@
 #include "ot.h"
 #include "pet.h"
 #include "params.h"
-#include "randombytes.h"
 
 #include "ds_benchmark.h"
 

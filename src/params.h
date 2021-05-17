@@ -2,6 +2,7 @@
 #define PARAMS_H
 
 #include <oqs/kem.h>
+#include <oqs/rand.h>
 
 #define KOP_KEM_ALG kyber_768
 #define KOP_SID_BYTES 8
@@ -21,6 +22,8 @@
 #define KOP_SK_BYTES KOP_KEM_namespace(length_secret_key)
 #define KOP_CT_BYTES KOP_KEM_namespace(length_ciphertext)
 #define KOP_SS_BYTES KOP_KEM_namespace(length_shared_secret)
+
+#define randombytes OQS_randombytes
 
 // TODO: This should be a changeable parameter
 #define KOP_OT_LOGN 2
