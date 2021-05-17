@@ -16,11 +16,11 @@ $(LIB): $(OBJECTS)
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-test: test.c $(LIB)
-	$(CC) $(TESTFLAGS) -o $@ $< $(LIB) $(LIBS) $(LIB)
+test: test.c $(OBJECTS:.o=.c) $(HEADERS)
+	$(CC) $(TESTFLAGS) -o $@ $< $(OBJECTS:.o=.c) $(LIBS)
 
-test_speed: test_speed.c group.c ot.c pet.c common.c randombytes.c
-	$(CC) $(CFLAGS) -o $@ $^ -lm -lcrypto -loqs
+test_speed: test_speed.c $(OBJECTS:.o=.c) $(HEADERS)
+	$(CC) $(CFLAGS) -o $@ $< $(OBJECTS:.o=.c) -lm $(LIBS)
 
 .PHONY: clean
 

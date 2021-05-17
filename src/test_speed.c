@@ -47,6 +47,11 @@ static void measure_timing()
     uint8_t prf_out[KOP_PRF_BYTES];
     uint8_t prf_in[KOP_SS_BYTES + KOP_INPUT_BYTES];
 
+    uint8_t kem_pk[KOP_PK_BYTES];
+    uint8_t kem_sk[KOP_SK_BYTES];
+    uint8_t kem_ct[KOP_CT_BYTES];
+    uint8_t kem_ss[KOP_SS_BYTES];
+
     size_t j;
 
     randombytes(sid, KOP_SID_BYTES);
@@ -80,6 +85,10 @@ static void measure_timing()
     TIME_OPERATION_ITERATIONS(hash_pks(a, pks_pointers, &hid), "hash_pks", 1000)
 
     TIME_OPERATION_ITERATIONS(pet_prf(prf_out, prf_in), "pet_prf", 1000)
+
+    TIME_OPERATION_ITERATIONS(KOP_KEM_KEYGEN(kem_pk, kem_sk), "kem_keygen", 1000)
+    TIME_OPERATION_ITERATIONS(KOP_KEM_ENCAPS(kem_ct, kem_ss, kem_pk), "kem_encaps", 1000)
+    TIME_OPERATION_ITERATIONS(KOP_KEM_DECAPS(kem_ss, kem_ct, kem_sk), "kem_decaps", 1000)
     PRINT_TIMER_FOOTER
 }
 

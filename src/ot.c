@@ -34,7 +34,7 @@ void kemot_receiver_init(uint8_t sk[KOP_SK_BYTES],
     }
     hid->kem = index;
     hash_pks(digest, pk_pointers, hid);
-    OQS_KEM_kyber_768_keypair(pks, sk);
+    KOP_KEM_KEYGEN(pks, sk);
     sub_pk(pks, pks, digest);
 
     // put the last group element in `index`-th place
@@ -72,14 +72,14 @@ void kemot_sender(uint8_t sss[KOP_OT_N * KOP_SS_BYTES],
     hid->kem = 0;
     hash_pks(digest, pk_pointers, hid);
     add_pk(pk, pks, digest);
-    OQS_KEM_kyber_768_encaps(cts, sss, pk);
+    KOP_KEM_ENCAPS(cts, sss, pk);
 
     for (i = 1; i < KOP_OT_N; i++) {
         pk_pointers[i - 1] = &pks[(i - 1) * KOP_PK_BYTES];
         hid->kem = i;
         hash_pks(digest, pk_pointers, hid);
         add_pk(pk, &pks[i * KOP_PK_BYTES], digest);
-        OQS_KEM_kyber_768_encaps(&cts[i * KOP_CT_BYTES], &sss[i * KOP_SS_BYTES], pk);
+        KOP_KEM_ENCAPS(&cts[i * KOP_CT_BYTES], &sss[i * KOP_SS_BYTES], pk);
     }
 }
 
@@ -105,5 +105,5 @@ void kemot_receiver_output(uint8_t ss[KOP_SS_BYTES],
         b = 1 - ((-(uint64_t)(i ^ index)) >> 63);
         cmov(ct, &cts[i * KOP_CT_BYTES], KOP_CT_BYTES, b);
     }
-    OQS_KEM_kyber_768_decaps(ss, ct, sk);
+    KOP_KEM_DECAPS(ss, ct, sk);
 }

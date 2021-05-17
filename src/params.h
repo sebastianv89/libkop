@@ -9,15 +9,13 @@
 
 /* Don't edit below this line */
 
-#if KOP_KEM_ALG == kyber_768
-#define KOP_KEM_namespace(s) OQS_KEM_kyber_768_##s
-#else
-#error KEM algorithm not supported
-#endif
+#define KOP_OQS_NS_I(a, b) OQS_KEM_##a##_##b
+#define KOP_OQS_NS(a, b) KOP_OQS_NS_I(a, b)
+#define KOP_KEM_namespace(s) KOP_OQS_NS(KOP_KEM_ALG, s)
 
-#define KOP_KEM_keygen KOP_KEM_namespace(keygen)
-#define KOP_KEM_encaps KOP_KEM_namespace(encaps)
-#define KOP_KEM_decaps KOP_KEM_namespace(decaps)
+#define KOP_KEM_KEYGEN KOP_KEM_namespace(keypair)
+#define KOP_KEM_ENCAPS KOP_KEM_namespace(encaps)
+#define KOP_KEM_DECAPS KOP_KEM_namespace(decaps)
 
 #define KOP_PK_BYTES KOP_KEM_namespace(length_public_key)
 #define KOP_SK_BYTES KOP_KEM_namespace(length_secret_key)
