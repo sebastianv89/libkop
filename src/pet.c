@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <openssl/evp.h>
+#include "SimpleFIPS202.h"
 
 #include "pet.h"
 #include "params.h"
@@ -33,14 +33,15 @@ static void words_from_bytes(uint8_t words[KOP_INPUT_WORDS], const uint8_t bytes
 void pet_prf(uint8_t out[KOP_PRF_BYTES],
              const uint8_t in[KOP_SS_BYTES + KOP_INPUT_BYTES])
 {
-    EVP_Digest(in, KOP_SS_BYTES + KOP_INPUT_BYTES, out, NULL, EVP_sha3_256(), NULL);
+    SHA3_512(out, in, KOP_SS_BYTES + KOP_INPUT_BYTES);
 }
 
 // Initialize the receiver of oblivious encoding
-static void oenc_recv_init(uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
-                           uint8_t pks[KOP_INPUT_WORDS * KOP_OT_N * KOP_PK_BYTES],
-                           uint8_t indices[KOP_INPUT_WORDS],
-                           hid_t *hid)
+static void oenc_recv_init(
+        uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+        uint8_t pks[KOP_INPUT_WORDS * KOP_OT_N * KOP_PK_BYTES],
+        uint8_t indices[KOP_INPUT_WORDS],
+        hid_t *hid)
 {
     size_t i;
 
@@ -54,12 +55,13 @@ static void oenc_recv_init(uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
 //
 // The sender could get arbitrary encodings, but for the PET we only require
 // the encoding of the input.
-static void oenc_send(uint8_t encoding[KOP_PRF_BYTES],
-                      uint8_t cts[KOP_INPUT_WORDS * KOP_OT_N * KOP_CT_BYTES],
-                      const uint8_t pks[KOP_INPUT_WORDS * KOP_OT_N * KOP_PK_BYTES],
-                      const uint8_t indices[KOP_INPUT_WORDS],
-                      const uint8_t input[KOP_INPUT_BYTES],
-                      hid_t *hid)
+static void oenc_send(
+        uint8_t encoding[KOP_PRF_BYTES],
+        uint8_t cts[KOP_INPUT_WORDS * KOP_OT_N * KOP_CT_BYTES],
+        const uint8_t pks[KOP_INPUT_WORDS * KOP_OT_N * KOP_PK_BYTES],
+        const uint8_t indices[KOP_INPUT_WORDS],
+        const uint8_t input[KOP_INPUT_BYTES],
+        hid_t *hid)
 {
     uint8_t secrets[KOP_OT_N * KOP_SS_BYTES];
     uint8_t prf_input[KOP_SS_BYTES + KOP_INPUT_BYTES];
@@ -84,11 +86,12 @@ static void oenc_send(uint8_t encoding[KOP_PRF_BYTES],
 }
 
 // Get receiver output of oblivious encoding.
-static void oenc_recv_out(uint8_t encoding[KOP_PRF_BYTES],
-                          const uint8_t cts[KOP_INPUT_WORDS * KOP_OT_N * KOP_CT_BYTES],
-                          const uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
-                          const uint8_t indices[KOP_INPUT_WORDS],
-                          const uint8_t input[KOP_INPUT_BYTES])
+static void oenc_recv_out(
+        uint8_t encoding[KOP_PRF_BYTES],
+        const uint8_t cts[KOP_INPUT_WORDS * KOP_OT_N * KOP_CT_BYTES],
+        const uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+        const uint8_t indices[KOP_INPUT_WORDS],
+        const uint8_t input[KOP_INPUT_BYTES])
 {
     uint8_t prf_input[KOP_SS_BYTES + KOP_INPUT_BYTES];
     uint8_t digest[KOP_PRF_BYTES];
@@ -114,10 +117,11 @@ static void oenc_recv_out(uint8_t encoding[KOP_PRF_BYTES],
 /// @param[out] pks  (KOP_INPUT_WORDS * KOP_OT_N) public keys, of length KOP_PK_BYTES each.
 ///                  Outgoing message to Bob.
 /// @param[in]  x    Alice's secret input.
-void pet_alice_m0(uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
-                  uint8_t pks[KOP_PET_MSG0_BYTES],
-                  const uint8_t x[KOP_INPUT_BYTES],
-                  const uint8_t sid[KOP_SID_BYTES])
+void pet_alice_m0(
+        uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+        uint8_t pks[KOP_PET_MSG0_BYTES],
+        const uint8_t x[KOP_INPUT_BYTES],
+        const uint8_t sid[KOP_SID_BYTES])
 {
     uint8_t indices[KOP_INPUT_WORDS];
     hid_t hid;
@@ -144,12 +148,13 @@ void pet_alice_m0(uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
 ///                      Outgoing message to Alice.
 /// @param[in]  pks_in   Incoming message from Alice, output of `pet_alice_m0`.
 /// @param[in]  y        Bob's secret input, of length KOP_INPUT_BYTES
-void pet_bob_m1(uint8_t y_b[KOP_PRF_BYTES],
-                uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
-                uint8_t msg_out[KOP_PET_MSG2_BYTES],
-                const uint8_t pks_in[KOP_PET_MSG1_BYTES],
-                const uint8_t y[KOP_INPUT_BYTES],
-                const uint8_t sid[KOP_SID_BYTES])
+void pet_bob_m1(
+        uint8_t y_b[KOP_PRF_BYTES],
+        uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+        uint8_t msg_out[KOP_PET_MSG1_BYTES],
+        const uint8_t pks_in[KOP_PET_MSG0_BYTES],
+        const uint8_t y[KOP_INPUT_BYTES],
+        const uint8_t sid[KOP_SID_BYTES])
 {
     uint8_t indices[KOP_INPUT_WORDS];
     uint8_t y_local[KOP_INPUT_BYTES];
@@ -184,12 +189,13 @@ void pet_bob_m1(uint8_t y_b[KOP_PRF_BYTES],
 /// @param[in]  msg_in   Incoming message from Bob, output of `pet_bob_m1`.
 /// @param[in]  sks      Alice's secret keys, output of `pet_alice_m0`.
 /// @param[in]  x        Alice's secret input, of length KOP_INPUT_BYTES.
-void pet_alice_m2(uint8_t x_a[KOP_PRF_BYTES],
-                  uint8_t msg_out[KOP_PET_MSG2_BYTES],
-                  const uint8_t msg_in[KOP_PET_MSG1_BYTES],
-                  const uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
-                  const uint8_t x[KOP_INPUT_BYTES],
-                  const uint8_t sid[KOP_SID_BYTES])
+void pet_alice_m2(
+        uint8_t x_a[KOP_PRF_BYTES],
+        uint8_t msg_out[KOP_PET_MSG2_BYTES],
+        const uint8_t msg_in[KOP_PET_MSG1_BYTES],
+        const uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+        const uint8_t x[KOP_INPUT_BYTES],
+        const uint8_t sid[KOP_SID_BYTES])
 {
     uint8_t indices[KOP_INPUT_WORDS];
     uint8_t x_a_local[KOP_PRF_BYTES];
@@ -230,11 +236,12 @@ void pet_alice_m2(uint8_t x_a[KOP_PRF_BYTES],
 /// @param[in]  y_b      Secret encoding of `y` in Bob's encoding, output of `pet_bob_m1`.
 ///
 /// @return     if `x == y` then return 1, otherwise return 0.
-int pet_bob_m3(uint8_t y_a[KOP_PET_MSG3_BYTES],
-               const uint8_t msg_in[KOP_PET_MSG2_BYTES],
-               const uint8_t y_b[KOP_PRF_BYTES],
-               const uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
-               const uint8_t y[KOP_INPUT_BYTES])
+int pet_bob_m3(
+        uint8_t y_a[KOP_PET_MSG3_BYTES],
+        const uint8_t msg_in[KOP_PET_MSG2_BYTES],
+        const uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+        const uint8_t y[KOP_INPUT_BYTES],
+        const uint8_t y_b[KOP_PRF_BYTES])
 {
     uint8_t y_a_local[KOP_PRF_BYTES];
     uint8_t y_ab[KOP_PRF_BYTES];
@@ -264,8 +271,9 @@ int pet_bob_m3(uint8_t y_a[KOP_PET_MSG3_BYTES],
 /// @param[in]  y_a  Bob's message, output of `pet_bob_m3`.
 /// @param[in]  x_a  Secret encoding of `x` in Alice's encoding, output of `pet_alice_m2`.
 /// @return     if `x == y` then return 1, otherwise return 0.
-int pet_alice_accept(const uint8_t y_a[KOP_PET_MSG3_BYTES],
-                     const uint8_t x_a[KOP_PRF_BYTES])
+int pet_alice_accept(
+        const uint8_t y_a[KOP_PET_MSG3_BYTES],
+        const uint8_t x_a[KOP_PRF_BYTES])
 {
     return 1 - verify(x_a, y_a, 32);
 }

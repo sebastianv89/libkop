@@ -1,10 +1,12 @@
 CC ?= /usr/bin/cc
 CFLAGS += -O3 -DNDEBUG -march=native -fomit-frame-pointer \
-	  -Wall -Wextra -Wmissing-prototypes -Wredundant-decls -Wshadow -Wpointer-arith
-LIBS = -lcrypto -loqs
+	  -Wall -Wextra -Wmissing-prototypes -Wredundant-decls -Wshadow -Wpointer-arith \
+	  -I./xkcp/libXKCP.a.headers
+LIBS = -L./xkcp -lXKCP -loqs
 RM = /bin/rm
 TESTFLAGS = -g -O0 -UNDEBUG -march=native \
-	    -Wall -Wextra -Wmissing-prototypes -Wredundant-decls -Wshadow -Wpointer-arith
+	    -Wall -Wextra -Wmissing-prototypes -Wredundant-decls -Wshadow -Wpointer-arith \
+	    -I./xkcp/libXKCP.a.headers
 
 LIB = libkop.a
 HEADERS = params.h group.h ot.h pet.h common.h

@@ -12,6 +12,9 @@
 
 #include "ds_benchmark.h"
 
+#define XSTR(s) STR(s)
+#define STR(s) #s
+
 static void measure_timing()
 {
     uint8_t sid[KOP_SID_BYTES];
@@ -66,6 +69,8 @@ static void measure_timing()
         pks_pointers[j] = &pks[j * KOP_PK_BYTES];
     }
     randombytes(prf_in, KOP_SS_BYTES + KOP_INPUT_BYTES);
+
+    printf("%s, σ=%u, N=%u\n", XSTR(KOP_KEM_ALG), KOP_INPUT_WORDS, KOP_OT_N);
 
     PRINT_TIMER_HEADER
     TIME_OPERATION_ITERATIONS(pet_alice_m0(a_sks, m0, a_x, sid), "pet_alice_m0", 1000)

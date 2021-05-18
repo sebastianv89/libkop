@@ -18,7 +18,7 @@ static int test_with_inputs(const uint8_t a_x[KOP_INPUT_BYTES],
     uint8_t a_x_a[KOP_PRF_BYTES];
 
     uint8_t b_sks[KOP_INPUT_WORDS * KOP_SK_BYTES];
-    uint8_t b_y_b[KOP_INPUT_WORDS * KOP_SK_BYTES];
+    uint8_t b_y_b[KOP_PRF_BYTES];
 
     uint8_t m0[KOP_PET_MSG0_BYTES];
     uint8_t m1[KOP_PET_MSG1_BYTES];
@@ -31,7 +31,7 @@ static int test_with_inputs(const uint8_t a_x[KOP_INPUT_BYTES],
     pet_alice_m0(a_sks, m0, a_x, sid);
     pet_bob_m1(b_y_b, b_sks, m1, m0, b_y, sid);
     pet_alice_m2(a_x_a, m2, m1, a_sks, a_x, sid);
-    bob = pet_bob_m3(m3, m2, b_y_b, b_sks, b_y);
+    bob = pet_bob_m3(m3, m2, b_sks, b_y, b_y_b);
     if (!bob) {
         return 0;
     }
@@ -58,7 +58,7 @@ static int test_buffer_overlap(const uint8_t a_x[KOP_INPUT_BYTES],
     pet_alice_m0(alice, msg, a_x, sid);
     pet_bob_m1(bob_y_b, bob_sks, msg, msg, b_y, sid);
     pet_alice_m2(alice, msg, msg, alice, a_x, sid);
-    b_out = pet_bob_m3(msg, msg, bob_y_b, bob_sks, b_y);
+    b_out = pet_bob_m3(msg, msg, bob_sks, b_y, bob_y_b);
     if (!b_out) {
         return 0;
     }
@@ -92,11 +92,6 @@ static void example_different_input()
     assert(!test_buffer_overlap(x, y, sid));
 }
 
-// kyber_768, σ=40, N=4
-// M0, A -> B:   189440 bytes (185 KiB) (σN public keys)
-// M1, B -> A:   363520 bytes (355 KiB) (σN (ciphertext + public key))
-// M2, A -> B:   174112 bytes (170 KiB) (encoding + σN ciphertexts))
-// M3, B -> A:       32 bytes           (encoding)
 static void print_sizes()
 {
     printf("%s, σ=%u, N=%u\n", XSTR(KOP_KEM_ALG), KOP_INPUT_WORDS, KOP_OT_N);
@@ -106,12 +101,25 @@ static void print_sizes()
     printf("M3, B -> A: %8u bytes (encoding)\n", KOP_PET_MSG3_BYTES);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+    size_t i, nr_of_tests = 16;
+
+    if (argc >= 2) {
+        nr_of_tests = atoi(argv[1]);
+        if (nr_of_tests == 0) {
+            fprintf(stderr, "Usage: %s [nr_of_tests]\n", argv[0]);
+            return EXIT_FAILURE;
+        }
+    }
+
+    printf("OQS %s\n", OQS_VERSION_TEXT);
     print_sizes();
-    for (size_t i = 0; i < 20; i++) {
+    for (i = 0; i < nr_of_tests; i++) {
         example_same_input();
         example_different_input();
     }
+
+    return EXIT_SUCCESS;
 }
 

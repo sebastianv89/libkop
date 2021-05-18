@@ -3,7 +3,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include <openssl/evp.h>
+#include "KeccakHash.h"
 
 #include "group.h"
 #include "params.h"
@@ -207,55 +207,27 @@ static void polyvec_sub(polyvec *r, const polyvec *a, const polyvec *b)
 //
 // Adapted from the Crystals/Kyber subroutine `gen_matrix`.
 // Does not generate more than one polyvec.
-// 
-// OpenSSL can't squeeze a XOF, so we apply a hack like liboqs does, cloning contexts
-// and dynamically allocating memory. (The overhead here could be worse than the gain
-// of using OpenSSL's optimized shake implementation)
-#define XOF_BLOCKBYTES 168
-#define GEN_POLYVEC_NBLOCKS ((12*KYBER_N/8*(1 << 12) / KYBER_Q + XOF_BLOCKBYTES)/XOF_BLOCKBYTES)
+#define SHAKE128_BYTERATE 168
+#define REJ_SAMPLE_BLOCKS ((12*KYBER_N/8*(1 << 12) / KYBER_Q + SHAKE128_BYTERATE)/SHAKE128_BYTERATE)
+#define REJ_SAMPLE_BYTES (REJ_SAMPLE_BLOCKS * SHAKE128_BYTERATE)
 static void gen_polyvec(polyvec *a, const uint8_t seed[KYBER_SYMBYTES])
 {
-    size_t ctr, i, squeeze_len;
-    size_t buflen;
-    uint8_t extseed[KYBER_SYMBYTES + 1];
-    uint8_t *buf;
-    EVP_MD_CTX *ctx, *ctx_clone;
-
-    ctx = EVP_MD_CTX_new();
-    ctx_clone = EVP_MD_CTX_new();
-    buflen = GEN_POLYVEC_NBLOCKS * XOF_BLOCKBYTES;
-    buf = malloc(buflen);
-    assert(buf != NULL);
-
-    for (i = 0; i < KYBER_SYMBYTES; i++) {
-        extseed[i] = seed[i];
-    }
+    size_t ctr, i;
+    uint8_t buf[REJ_SAMPLE_BYTES];
+    Keccak_HashInstance khi;
 
     for (i = 0; i < KYBER_K; i++) {
-        extseed[KYBER_SYMBYTES] = (uint8_t)i;
-        EVP_DigestInit_ex(ctx, EVP_shake128(), NULL);
-        EVP_DigestUpdate(ctx, extseed, sizeof(extseed));
-        EVP_DigestInit_ex(ctx_clone, EVP_shake128(), NULL);
-        EVP_MD_CTX_copy_ex(ctx_clone, ctx);
-        EVP_DigestFinalXOF(ctx_clone, buf, GEN_POLYVEC_NBLOCKS * XOF_BLOCKBYTES);
-        ctr = rej_uniform(a->vec[i].coeffs, KYBER_N, buf, buflen);
-        squeeze_len = (buflen / 3) * 3;
-
+        Keccak_HashInitialize_SHAKE128(&khi);
+        Keccak_HashUpdate(&khi, seed, 8 * KYBER_SYMBYTES);
+        Keccak_HashUpdate(&khi, (uint8_t *)(&i), 8);
+        Keccak_HashFinal(&khi, NULL);
+        Keccak_HashSqueeze(&khi, buf, 8 * REJ_SAMPLE_BYTES);
+        ctr = rej_uniform(a->vec[i].coeffs, KYBER_N, buf, REJ_SAMPLE_BYTES);
         while(ctr < KYBER_N) {
-            free(buf);
-            buflen += XOF_BLOCKBYTES;
-            buf = malloc(buflen);
-            assert(buf != NULL);
-            EVP_DigestInit_ex(ctx_clone, EVP_shake128(), NULL);
-            EVP_MD_CTX_copy_ex(ctx_clone, ctx);
-            EVP_DigestFinalXOF(ctx_clone, buf, buflen);
-            ctr += rej_uniform(a->vec[i].coeffs + ctr, KYBER_N - ctr, buf + squeeze_len, buflen - squeeze_len);
-            squeeze_len = (buflen / 3) * 3;
+            Keccak_HashSqueeze(&khi, buf, 8 * SHAKE128_BYTERATE);
+            ctr += rej_uniform(a->vec[i].coeffs + ctr, KYBER_N - ctr, buf, SHAKE128_BYTERATE);
         }
     }
-    free(buf);
-    EVP_MD_CTX_free(ctx);
-    EVP_MD_CTX_free(ctx_clone);
 }
 
 /// r = a + b
@@ -335,23 +307,19 @@ void random_pk(uint8_t pk[KOP_PK_BYTES])
 /// @param[in]  hid  unique identifier, ensures domain separation
 void hash_pks(uint8_t pk[KOP_PK_BYTES], const uint8_t * const pks[KOP_OT_N - 1], const hid_t *hid)
 {
-    EVP_MD_CTX *ctx;
-    uint8_t seed[2 * KYBER_SYMBYTES];
-    uint8_t hid_buf[KOP_SID_BYTES + 3];
+    Keccak_HashInstance khi;
+    uint8_t digest[64];
     size_t i;
 
-    memcpy(hid_buf, hid->sid, KOP_SID_BYTES);
-    hid_buf[KOP_SID_BYTES    ] = hid->oenc;
-    hid_buf[KOP_SID_BYTES + 1] = hid->ot;
-    hid_buf[KOP_SID_BYTES + 2] = hid->kem;
-    ctx = EVP_MD_CTX_new();
-    EVP_DigestInit_ex(ctx, EVP_sha3_512(), NULL);
-    EVP_DigestUpdate(ctx, hid_buf, KOP_SID_BYTES + 3);
+    Keccak_HashInitialize_SHA3_512(&khi);
+    Keccak_HashUpdate(&khi, hid->sid, 8 * KOP_SID_BYTES);
+    Keccak_HashUpdate(&khi, &hid->oenc, 8);
+    Keccak_HashUpdate(&khi, &hid->ot, 8);
+    Keccak_HashUpdate(&khi, &hid->kem, 8);
     for (i = 0; i < KOP_OT_N - 1; i++) {
-        EVP_DigestUpdate(ctx, pks[i], KOP_PK_BYTES);
+        Keccak_HashUpdate(&khi, pks[i], KOP_PK_BYTES);
     }
-    EVP_DigestFinal_ex(ctx, seed, NULL);
-    gen_pk(pk, seed);
-    EVP_MD_CTX_free(ctx);
+    Keccak_HashFinal(&khi, digest);
+    gen_pk(pk, digest);
 }
 
