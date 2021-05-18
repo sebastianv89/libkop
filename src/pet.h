@@ -12,14 +12,14 @@
 void pet_prf(uint8_t out[KOP_PRF_BYTES], const uint8_t in[KOP_SS_BYTES + KOP_INPUT_BYTES]);
 
 void pet_alice_m0(
-        uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+        uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
         uint8_t pks[KOP_PET_MSG0_BYTES],
         const uint8_t x[KOP_INPUT_BYTES],
         const uint8_t sid[KOP_SID_BYTES]);
 
 void pet_bob_m1(
         uint8_t y_b[KOP_PRF_BYTES],
-        uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+        uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
         uint8_t msg_out[KOP_PET_MSG1_BYTES],
         const uint8_t pks_in[KOP_PET_MSG0_BYTES],
         const uint8_t y[KOP_INPUT_BYTES],
@@ -29,14 +29,14 @@ void pet_alice_m2(
         uint8_t x_a[KOP_PRF_BYTES],
         uint8_t msg_out[KOP_PET_MSG2_BYTES],
         const uint8_t msg_in[KOP_PET_MSG1_BYTES],
-        const uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+        const uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
         const uint8_t x[KOP_INPUT_BYTES],
         const uint8_t sid[KOP_SID_BYTES]);
 
 int pet_bob_m3(
         uint8_t y_a[KOP_PET_MSG3_BYTES],
         const uint8_t msg_in[KOP_PET_MSG2_BYTES],
-        const uint8_t sks[KOP_INPUT_WORDS * KOP_SK_BYTES],
+        const uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
         const uint8_t y[KOP_INPUT_BYTES],
         const uint8_t y_b[KOP_PRF_BYTES]);
 

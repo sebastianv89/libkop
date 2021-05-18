@@ -4,9 +4,21 @@
 #include <oqs/kem.h>
 #include <oqs/rand.h>
 
+#ifndef KOP_KEM_ALG
 #define KOP_KEM_ALG kyber_768
+#endif
+
+#ifndef KOP_SID_BYTES
 #define KOP_SID_BYTES 8
+#endif
+
+#ifndef KOP_INPUT_BYTES
 #define KOP_INPUT_BYTES 10
+#endif
+
+#ifndef KOP_OT_LOGN
+#define KOP_OT_LOGN 2
+#endif
 
 /* Don't edit below this line */
 
@@ -25,21 +37,21 @@
 
 #define randombytes OQS_randombytes
 
-// TODO: This should be a changeable parameter
-#define KOP_OT_LOGN 2
-
 #define KOP_OT_N (1 << KOP_OT_LOGN)
-#define KOP_INPUT_WORDS ((KOP_INPUT_BYTES * 8 + KOP_OT_LOGN - 1) / KOP_OT_LOGN)
+#if KOP_OT_LOGN > 8
+#error large N not (yet?) supported 
+#endif
+typedef uint8_t kop_pet_index_t;
+#define KOP_SIGMA ((KOP_INPUT_BYTES * 8 + KOP_OT_LOGN - 1) / KOP_OT_LOGN)
 
-// TODO: This should be derived from whatever PRF we use
 #define KOP_PRF_BYTES 32
 
 #define KOP_OT_MSG0_BYTES (KOP_OT_N * KOP_PK_BYTES)
 #define KOP_OT_MSG1_BYTES (KOP_OT_N * KOP_CT_BYTES)
 
-#define KOP_PET_MSG0_BYTES (KOP_INPUT_WORDS * KOP_OT_MSG0_BYTES)
-#define KOP_PET_MSG1_BYTES (KOP_INPUT_WORDS * (KOP_OT_MSG0_BYTES + KOP_OT_MSG1_BYTES))
-#define KOP_PET_MSG2_BYTES (KOP_PRF_BYTES + KOP_INPUT_WORDS * KOP_OT_MSG1_BYTES)
+#define KOP_PET_MSG0_BYTES (KOP_SIGMA * KOP_OT_MSG0_BYTES)
+#define KOP_PET_MSG1_BYTES (KOP_SIGMA * (KOP_OT_MSG0_BYTES + KOP_OT_MSG1_BYTES))
+#define KOP_PET_MSG2_BYTES (KOP_PRF_BYTES + KOP_SIGMA * KOP_OT_MSG1_BYTES)
 #define KOP_PET_MSG3_BYTES (KOP_PRF_BYTES)
 
 #endif

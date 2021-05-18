@@ -14,10 +14,10 @@ static int test_with_inputs(const uint8_t a_x[KOP_INPUT_BYTES],
                             const uint8_t b_y[KOP_INPUT_BYTES],
                             const uint8_t sid[KOP_SID_BYTES])
 {
-    uint8_t a_sks[KOP_INPUT_WORDS * KOP_SK_BYTES];
+    uint8_t a_sks[KOP_SIGMA * KOP_SK_BYTES];
     uint8_t a_x_a[KOP_PRF_BYTES];
 
-    uint8_t b_sks[KOP_INPUT_WORDS * KOP_SK_BYTES];
+    uint8_t b_sks[KOP_SIGMA * KOP_SK_BYTES];
     uint8_t b_y_b[KOP_PRF_BYTES];
 
     uint8_t m0[KOP_PET_MSG0_BYTES];
@@ -48,8 +48,8 @@ static int test_with_inputs(const uint8_t a_x[KOP_INPUT_BYTES],
 static int test_buffer_overlap(const uint8_t a_x[KOP_INPUT_BYTES],
                                const uint8_t b_y[KOP_INPUT_BYTES],
                                const uint8_t sid[KOP_SID_BYTES]) {
-    uint8_t alice[MAX(KOP_INPUT_WORDS * KOP_SK_BYTES, KOP_PRF_BYTES)];
-    uint8_t bob[KOP_PRF_BYTES + KOP_INPUT_WORDS * KOP_SK_BYTES];
+    uint8_t alice[MAX(KOP_SIGMA * KOP_SK_BYTES, KOP_PRF_BYTES)];
+    uint8_t bob[KOP_PRF_BYTES + KOP_SIGMA * KOP_SK_BYTES];
     uint8_t msg[MAX(MAX(KOP_PET_MSG0_BYTES, KOP_PET_MSG1_BYTES), MAX(KOP_PET_MSG2_BYTES, KOP_PET_MSG3_BYTES))];
     uint8_t *bob_y_b = bob;
     uint8_t *bob_sks = &bob[KOP_PRF_BYTES];
@@ -94,7 +94,7 @@ static void example_different_input()
 
 static void print_sizes()
 {
-    printf("%s, σ=%u, N=%u\n", XSTR(KOP_KEM_ALG), KOP_INPUT_WORDS, KOP_OT_N);
+    printf("%s, σ=%u, N=%u\n", XSTR(KOP_KEM_ALG), KOP_SIGMA, KOP_OT_N);
     printf("M0, A -> B: %8u bytes (σN public keys)\n", KOP_PET_MSG0_BYTES);
     printf("M1, B -> A: %8u bytes (σN (ciphertext + public key))\n", KOP_PET_MSG1_BYTES);
     printf("M2, A -> B: %8u bytes (encoding + σN ciphertexts))\n", KOP_PET_MSG2_BYTES);

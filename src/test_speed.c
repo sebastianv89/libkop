@@ -20,12 +20,12 @@ static void measure_timing()
     uint8_t sid[KOP_SID_BYTES];
 
     uint8_t a_x[KOP_INPUT_BYTES];
-    uint8_t a_sks[KOP_INPUT_WORDS * KOP_SK_BYTES];
+    uint8_t a_sks[KOP_SIGMA * KOP_SK_BYTES];
     uint8_t a_x_a[KOP_PRF_BYTES];
 
     uint8_t b_y[KOP_INPUT_BYTES];
-    uint8_t b_sks[KOP_INPUT_WORDS * KOP_SK_BYTES];
-    uint8_t b_y_b[KOP_INPUT_WORDS * KOP_SK_BYTES];
+    uint8_t b_sks[KOP_SIGMA * KOP_SK_BYTES];
+    uint8_t b_y_b[KOP_SIGMA * KOP_SK_BYTES];
 
     uint8_t m0[KOP_PET_MSG0_BYTES];
     uint8_t m1[KOP_PET_MSG1_BYTES];
@@ -70,7 +70,7 @@ static void measure_timing()
     }
     randombytes(prf_in, KOP_SS_BYTES + KOP_INPUT_BYTES);
 
-    printf("%s, σ=%u, N=%u\n", XSTR(KOP_KEM_ALG), KOP_INPUT_WORDS, KOP_OT_N);
+    printf("%s, σ=%u, N=%u\n", XSTR(KOP_KEM_ALG), KOP_SIGMA, KOP_OT_N);
 
     PRINT_TIMER_HEADER
     TIME_OPERATION_ITERATIONS(pet_alice_m0(a_sks, m0, a_x, sid), "pet_alice_m0", 1000)
