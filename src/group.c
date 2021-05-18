@@ -13,8 +13,11 @@
 /// [0]: github.com/pq-crystals/kyber/tree/master/ref
 ///////
 
-#define KYBER_N 256
+#ifndef KYBER_K
 #define KYBER_K 3
+#endif
+
+#define KYBER_N 256
 #define KYBER_Q 3329
 
 #define KYBER_SYMBYTES      32
@@ -35,7 +38,7 @@ static void poly_tobytes(uint8_t r[KYBER_POLYBYTES], const poly *a)
     size_t i;
     uint16_t t0, t1;
 
-    for(i = 0; i < KYBER_N / 2; i++) {
+    for (i = 0; i < KYBER_N / 2; i++) {
         // map to positive standard representatives
         t0  = a->coeffs[2 * i];
         t0 += ((int16_t)t0 >> 15) & KYBER_Q;
@@ -52,7 +55,7 @@ static void poly_frombytes(poly *r, const uint8_t a[KYBER_POLYBYTES])
 {
     size_t i;
 
-    for(i = 0; i < KYBER_N / 2; i++) {
+    for (i = 0; i < KYBER_N / 2; i++) {
         r->coeffs[2 * i]     = ((a[3 * i + 0] >> 0) | ((uint16_t)a[3 * i + 1] << 8)) & 0xFFF;
         r->coeffs[2 * i + 1] = ((a[3 * i + 1] >> 4) | ((uint16_t)a[3 * i + 2] << 4)) & 0xFFF;
     }
@@ -73,7 +76,7 @@ static void poly_reduce(poly *r)
 {
     size_t i;
 
-    for(i = 0; i < KYBER_N; i++)
+    for (i = 0; i < KYBER_N; i++)
         r->coeffs[i] = barrett_reduce(r->coeffs[i]);
 }
 
@@ -82,7 +85,7 @@ static void poly_add(poly *r, const poly *a, const poly *b)
 {
     size_t i;
 
-    for(i = 0; i < KYBER_N; i++) {
+    for (i = 0; i < KYBER_N; i++) {
         r->coeffs[i] = a->coeffs[i] + b->coeffs[i];
     }
 }
@@ -92,7 +95,7 @@ static void poly_sub(poly *r, const poly *a, const poly *b)
 {
     size_t i;
 
-    for(i = 0; i < KYBER_N; i++) {
+    for (i = 0; i < KYBER_N; i++) {
         r->coeffs[i] = a->coeffs[i] - b->coeffs[i];
     }
 }
@@ -102,7 +105,7 @@ static void polyvec_tobytes(uint8_t r[KYBER_POLYVECBYTES], polyvec *a)
 {
     size_t i;
 
-    for(i = 0; i < KYBER_K; i++) {
+    for (i = 0; i < KYBER_K; i++) {
         poly_tobytes(r + i * KYBER_POLYBYTES, &a->vec[i]);
     }
 }
@@ -112,7 +115,7 @@ static void polyvec_frombytes(polyvec *r, const uint8_t a[KYBER_POLYVECBYTES])
 {
     size_t i;
 
-    for(i = 0; i < KYBER_K; i++) {
+    for (i = 0; i < KYBER_K; i++) {
         poly_frombytes(&r->vec[i], a + i * KYBER_POLYBYTES);
     }
 }
@@ -122,7 +125,7 @@ static void polyvec_reduce(polyvec *r)
 {
     size_t i;
 
-    for(i = 0; i < KYBER_K; i++) {
+    for (i = 0; i < KYBER_K; i++) {
         poly_reduce(&r->vec[i]);
     }
 }
@@ -132,56 +135,59 @@ static void polyvec_add(polyvec *r, const polyvec *a, const polyvec *b)
 {
     size_t i;
 
-    for(i = 0; i < KYBER_K; i++) {
+    for (i = 0; i < KYBER_K; i++) {
         poly_add(&r->vec[i], &a->vec[i], &b->vec[i]);
     }
 }
 
 // Serialize vector of polynomials and seed into bytes.
-static void pack_pk(uint8_t r[KOP_PK_BYTES],
-                    polyvec *pk,
-                    const uint8_t seed[KYBER_SYMBYTES])
+static void pack_pk(
+    uint8_t r[KOP_PK_BYTES],
+    polyvec *pk,
+    const uint8_t seed[KYBER_SYMBYTES])
 {
     size_t i;
 
     polyvec_tobytes(r, pk);
-    for(i = 0; i < KYBER_SYMBYTES; i++) {
+    for (i = 0; i < KYBER_SYMBYTES; i++) {
         r[i + KYBER_POLYVECBYTES] = seed[i];
     }
 }
 
 // De-serialize vector of polynomials and seed from bytes.
-static void unpack_pk(polyvec *pk,
-                      uint8_t seed[KYBER_SYMBYTES],
-                      const uint8_t packedpk[KOP_PK_BYTES])
+static void unpack_pk(
+    polyvec *pk,
+    uint8_t seed[KYBER_SYMBYTES],
+    const uint8_t packedpk[KOP_PK_BYTES])
 {
     size_t i;
 
     polyvec_frombytes(pk, packedpk);
-    for(i = 0; i < KYBER_SYMBYTES; i++) {
+    for (i = 0; i < KYBER_SYMBYTES; i++) {
         seed[i] = packedpk[i + KYBER_POLYVECBYTES];
     }
 }
 
 // rejection sampling (three bytes to two coordinates mod q)
-static size_t rej_uniform(int16_t *r,
-                          size_t len,
-                          const uint8_t *buf,
-                          size_t buflen)
+static size_t rej_uniform(
+    int16_t *r,
+    size_t len,
+    const uint8_t *buf,
+    size_t buflen)
 {
     size_t ctr, pos;
     uint16_t val0, val1;
 
     ctr = pos = 0;
-    while(ctr < len && pos + 3 <= buflen) {
+    while (ctr < len && pos + 3 <= buflen) {
         val0 = ((buf[pos + 0] >> 0) | ((uint16_t)buf[pos + 1] << 8)) & 0xFFF;
         val1 = ((buf[pos + 1] >> 4) | ((uint16_t)buf[pos + 2] << 4)) & 0xFFF;
         pos += 3;
 
-        if(val0 < KYBER_Q) {
+        if (val0 < KYBER_Q) {
             r[ctr++] = val0;
         }
-        if(ctr < len && val1 < KYBER_Q) {
+        if (ctr < len && val1 < KYBER_Q) {
             r[ctr++] = val1;
         }
     }
@@ -198,7 +204,7 @@ static void polyvec_sub(polyvec *r, const polyvec *a, const polyvec *b)
 {
     size_t i;
 
-    for(i = 0; i < KYBER_K; i++) {
+    for (i = 0; i < KYBER_K; i++) {
         poly_sub(&r->vec[i], &a->vec[i], &b->vec[i]);
     }
 }
@@ -223,7 +229,7 @@ static void gen_polyvec(polyvec *a, const uint8_t seed[KYBER_SYMBYTES])
         Keccak_HashFinal(&khi, NULL);
         Keccak_HashSqueeze(&khi, buf, 8 * REJ_SAMPLE_BYTES);
         ctr = rej_uniform(a->vec[i].coeffs, KYBER_N, buf, REJ_SAMPLE_BYTES);
-        while(ctr < KYBER_N) {
+        while (ctr < KYBER_N) {
             Keccak_HashSqueeze(&khi, buf, 8 * SHAKE128_BYTERATE);
             ctr += rej_uniform(a->vec[i].coeffs + ctr, KYBER_N - ctr, buf, SHAKE128_BYTERATE);
         }
