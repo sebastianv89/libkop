@@ -73,22 +73,22 @@ static void measure_timing()
     printf("%s, σ=%u, N=%u\n", XSTR(KOP_KEM_ALG), KOP_SIGMA, KOP_OT_N);
 
     PRINT_TIMER_HEADER
-    TIME_OPERATION_ITERATIONS(pet_alice_m0(a_sks, m0, a_x, sid), "pet_alice_m0", 1000)
-    TIME_OPERATION_ITERATIONS(pet_bob_m1(b_y_b, b_sks, m1, m0, b_y, sid), "pet_bob_m1", 300)
-    TIME_OPERATION_ITERATIONS(pet_alice_m2(a_x_a, m2, m1, a_sks, a_x, sid), "pet_alice_m2", 300)
-    TIME_OPERATION_ITERATIONS(pet_bob_m3(m3, m2, b_sks, b_y, b_y_b), "pet_bob_m3", 1000)
-    TIME_OPERATION_ITERATIONS(pet_alice_accept(m3, a_x_a), "pet_alice_accept", 1000)
+    TIME_OPERATION_ITERATIONS(kop_pet_alice_m0(a_sks, m0, a_x, sid), "pet_alice_m0", 1000)
+    TIME_OPERATION_ITERATIONS(kop_pet_bob_m1(b_y_b, b_sks, m1, m0, b_y, sid), "pet_bob_m1", 300)
+    TIME_OPERATION_ITERATIONS(kop_pet_alice_m2(a_x_a, m2, m1, a_sks, a_x, sid), "pet_alice_m2", 300)
+    TIME_OPERATION_ITERATIONS(kop_pet_bob_m3(m3, m2, b_sks, b_y, b_y_b), "pet_bob_m3", 1000)
+    TIME_OPERATION_ITERATIONS(kop_pet_alice_accept(m3, a_x_a), "pet_alice_accept", 1000)
 
-    TIME_OPERATION_ITERATIONS(kemot_receiver_init(ot_sk, ot_pks, ot_index, &hid), "ot_recv_init", 1000)
-    TIME_OPERATION_ITERATIONS(kemot_sender(ot_sss, ot_cts, ot_pks, &hid), "ot_send", 1000)
-    TIME_OPERATION_ITERATIONS(kemot_receiver_output(ot_ss, ot_cts, ot_sk, ot_index), "ot_recv_out", 1000)
+    TIME_OPERATION_ITERATIONS(kop_ot_recv_init(ot_sk, ot_pks, ot_index, &hid), "ot_recv_init", 1000)
+    TIME_OPERATION_ITERATIONS(kop_ot_send(ot_sss, ot_cts, ot_pks, &hid), "ot_send", 1000)
+    TIME_OPERATION_ITERATIONS(kop_ot_recv_out(ot_ss, ot_cts, ot_sk, ot_index), "ot_recv_out", 1000)
 
     TIME_OPERATION_ITERATIONS(add_pk(a, a, b), "add_pk", 1000)
     TIME_OPERATION_ITERATIONS(sub_pk(a, a, b), "sub_pk", 1000)
     TIME_OPERATION_ITERATIONS(random_pk(a), "random_pk", 1000)
     TIME_OPERATION_ITERATIONS(hash_pks(a, pks_pointers, &hid), "hash_pks", 1000)
 
-    TIME_OPERATION_ITERATIONS(pet_prf(prf_out, prf_in), "pet_prf", 1000)
+    TIME_OPERATION_ITERATIONS(kop_pet_prf(prf_out, prf_in), "pet_prf", 1000)
 
     TIME_OPERATION_ITERATIONS(KOP_KEM_KEYGEN(kem_pk, kem_sk), "kem_keygen", 1000)
     TIME_OPERATION_ITERATIONS(KOP_KEM_ENCAPS(kem_ct, kem_ss, kem_pk), "kem_encaps", 1000)

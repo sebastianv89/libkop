@@ -28,14 +28,14 @@ static int test_with_inputs(const uint8_t a_x[KOP_INPUT_BYTES],
     int alice, bob;
 
     // execute PET
-    pet_alice_m0(a_sks, m0, a_x, sid);
-    pet_bob_m1(b_y_b, b_sks, m1, m0, b_y, sid);
-    pet_alice_m2(a_x_a, m2, m1, a_sks, a_x, sid);
-    bob = pet_bob_m3(m3, m2, b_sks, b_y, b_y_b);
+    kop_pet_alice_m0(a_sks, m0, a_x, sid);
+    kop_pet_bob_m1(b_y_b, b_sks, m1, m0, b_y, sid);
+    kop_pet_alice_m2(a_x_a, m2, m1, a_sks, a_x, sid);
+    bob = kop_pet_bob_m3(m3, m2, b_sks, b_y, b_y_b);
     if (!bob) {
         return 0;
     }
-    alice = pet_alice_accept(m3, a_x_a);
+    alice = kop_pet_alice_accept(m3, a_x_a);
     if (!alice) {
         fprintf(stderr, "Alice did not accept while Bob did\n");
         return 0;
@@ -55,14 +55,14 @@ static int test_buffer_overlap(const uint8_t a_x[KOP_INPUT_BYTES],
     uint8_t *bob_sks = &bob[KOP_PRF_BYTES];
     int a_out, b_out;
 
-    pet_alice_m0(alice, msg, a_x, sid);
-    pet_bob_m1(bob_y_b, bob_sks, msg, msg, b_y, sid);
-    pet_alice_m2(alice, msg, msg, alice, a_x, sid);
-    b_out = pet_bob_m3(msg, msg, bob_sks, b_y, bob_y_b);
+    kop_pet_alice_m0(alice, msg, a_x, sid);
+    kop_pet_bob_m1(bob_y_b, bob_sks, msg, msg, b_y, sid);
+    kop_pet_alice_m2(alice, msg, msg, alice, a_x, sid);
+    b_out = kop_pet_bob_m3(msg, msg, bob_sks, b_y, bob_y_b);
     if (!b_out) {
         return 0;
     }
-    a_out = pet_alice_accept(msg, alice);
+    a_out = kop_pet_alice_accept(msg, alice);
     if (!a_out) {
         fprintf(stderr, "Alice did not accept while Bob did\n");
         return 0;

@@ -8,6 +8,8 @@ TESTFLAGS = -g -O0 -UNDEBUG -march=native \
 	    -Wall -Wextra -Wmissing-prototypes -Wredundant-decls -Wshadow -Wpointer-arith \
 	    -I./xkcp/libXKCP.a.headers
 
+# TODO: implement a way to automatically compile libXKCP
+
 LIB = libkop.a
 HEADERS = params.h group.h ot.h pet.h common.h
 OBJECTS = group.o ot.o pet.o common.o

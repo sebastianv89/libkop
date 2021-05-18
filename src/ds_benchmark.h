@@ -103,71 +103,71 @@ PRINT_TIMER_FOOTER
 #include <windows.h>
 
 int gettimeofday(struct timeval *tp, struct timezone *tzp) {
-	// Note: some broken versions only have 8 trailing zero's, the correct epoch has 9 trailing zero's
-	static const uint64_t EPOCH = ((uint64_t) 116444736000000000ULL);
+    // Note: some broken versions only have 8 trailing zero's, the correct epoch has 9 trailing zero's
+    static const uint64_t EPOCH = ((uint64_t) 116444736000000000ULL);
 
-	SYSTEMTIME system_time;
-	FILETIME file_time;
-	uint64_t time;
+    SYSTEMTIME system_time;
+    FILETIME file_time;
+    uint64_t time;
 
-	GetSystemTime(&system_time);
-	SystemTimeToFileTime(&system_time, &file_time);
-	time = ((uint64_t) file_time.dwLowDateTime);
-	time += ((uint64_t) file_time.dwHighDateTime) << 32;
-	tp->tv_sec = (long) ((time - EPOCH) / 10000000L);
-	tp->tv_usec = (long) (system_time.wMilliseconds * 1000);
-	return 0;
+    GetSystemTime(&system_time);
+    SystemTimeToFileTime(&system_time, &file_time);
+    time = ((uint64_t) file_time.dwLowDateTime);
+    time += ((uint64_t) file_time.dwHighDateTime) << 32;
+    tp->tv_sec = (long) ((time - EPOCH) / 10000000L);
+    tp->tv_usec = (long) (system_time.wMilliseconds * 1000);
+    return 0;
 }
 #endif
 
 static uint64_t _bench_rdtsc(void) {
 #if defined(_WIN32) || defined(_WIN64)
-	return __rdtsc();
+    return __rdtsc();
 #elif defined(__i586__) || defined(__amd64__)
-	uint64_t x;
-	__asm__ volatile(".byte 0x0f, 0x31"
-	                 : "=A"(x));
-	return x;
+    uint64_t x;
+    __asm__ volatile(".byte 0x0f, 0x31"
+                     : "=A"(x));
+    return x;
 #elif defined(__arm__) && !defined(_RASPBERRY_PI)
-	/* Use the ARM performance counters. */
-	unsigned int value;
-	/* Read CCNT Register */
-	asm volatile("mrc p15, 0, %0, c9, c13, 0\t\n"
-	             : "=r"(value));
-	return value;
+    /* Use the ARM performance counters. */
+    unsigned int value;
+    /* Read CCNT Register */
+    asm volatile("mrc p15, 0, %0, c9, c13, 0\t\n"
+                 : "=r"(value));
+    return value;
 #else
 #define USING_TIME_RATHER_THAN_CYCLES
-	struct timespec time;
-	clock_gettime(CLOCK_REALTIME, &time);
-	return (uint64_t)(time.tv_sec * 1e9 + time.tv_nsec);
+    struct timespec time;
+    clock_gettime(CLOCK_REALTIME, &time);
+    return (uint64_t)(time.tv_sec * 1e9 + time.tv_nsec);
 #endif
 }
 
 #if defined(__arm__) && !defined(_RASPBERRY_PI)
 static void _bench_init_perfcounters(int32_t do_reset, int32_t enable_divider) {
-	/* In general enable all counters (including cycle counter) */
-	int32_t value = 1;
+    /* In general enable all counters (including cycle counter) */
+    int32_t value = 1;
 
-	/* Peform reset */
-	if (do_reset) {
-		value |= 2; /* reset all counters to zero */
-		value |= 4; /* reset cycle counter to zero */
-	}
+    /* Peform reset */
+    if (do_reset) {
+        value |= 2; /* reset all counters to zero */
+        value |= 4; /* reset cycle counter to zero */
+    }
 
-	if (enable_divider) {
-		value |= 8;    /* enable "by 64" divider for CCNT */
-	}
+    if (enable_divider) {
+        value |= 8;    /* enable "by 64" divider for CCNT */
+    }
 
-	value |= 16;
+    value |= 16;
 
-	/* Program the performance-counter control-register */
-	asm volatile("mcr p15, 0, %0, c9, c12, 0\t\n" ::"r"(value));
+    /* Program the performance-counter control-register */
+    asm volatile("mcr p15, 0, %0, c9, c12, 0\t\n" ::"r"(value));
 
-	/* Enable all counters */
-	asm volatile("mcr p15, 0, %0, c9, c12, 1\t\n" ::"r"(0x8000000f));
+    /* Enable all counters */
+    asm volatile("mcr p15, 0, %0, c9, c12, 1\t\n" ::"r"(0x8000000f));
 
-	/* Clear overflows */
-	asm volatile("mcr p15, 0, %0, c9, c12, 3\t\n" ::"r"(0x8000000f));
+    /* Clear overflows */
+    asm volatile("mcr p15, 0, %0, c9, c12, 3\t\n" ::"r"(0x8000000f));
 }
 #endif
 
