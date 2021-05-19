@@ -9,96 +9,118 @@
 #include "ot.h"
 #include "pet.h"
 #include "params.h"
+#include "randombytes.h"
 
 #include "ds_benchmark.h"
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
-static void measure_timing()
-{
-    uint8_t sid[KOP_SID_BYTES];
-
-    uint8_t a_x[KOP_INPUT_BYTES];
-    uint8_t a_sks[KOP_SIGMA * KOP_SK_BYTES];
-    uint8_t a_x_a[KOP_PRF_BYTES];
-
-    uint8_t b_y[KOP_INPUT_BYTES];
-    uint8_t b_sks[KOP_SIGMA * KOP_SK_BYTES];
-    uint8_t b_y_b[KOP_SIGMA * KOP_SK_BYTES];
-
-    uint8_t m0[KOP_PET_MSG0_BYTES];
-    uint8_t m1[KOP_PET_MSG1_BYTES];
-    uint8_t m2[KOP_PET_MSG2_BYTES];
-    uint8_t m3[KOP_PET_MSG3_BYTES];
-
+static void measure_group(int iterations) {
+    kop_kem_pk_s a, b, pks[KOP_OT_N - 1];
+    const kop_kem_pk_s * pk_pointers[KOP_OT_N - 1];
+    size_t j;
     hid_t hid;
 
-    uint8_t ot_sk[KOP_SK_BYTES];
-    uint8_t ot_ss[KOP_SS_BYTES];
-    uint8_t ot_pks[KOP_OT_N * KOP_PK_BYTES];
-    uint8_t ot_sss[KOP_OT_N * KOP_SS_BYTES];
-    uint8_t ot_cts[KOP_OT_N * KOP_CT_BYTES];
-    uint8_t ot_index = 0;
-
-    uint8_t a[KOP_PK_BYTES];
-    uint8_t b[KOP_PK_BYTES];
-    uint8_t pks[(KOP_OT_N-1) * KOP_PK_BYTES];
-    const uint8_t *pks_pointers[KOP_OT_N - 1];
-
-    uint8_t prf_out[KOP_PRF_BYTES];
-    uint8_t prf_in[KOP_SS_BYTES + KOP_INPUT_BYTES];
-
-    uint8_t kem_pk[KOP_PK_BYTES];
-    uint8_t kem_sk[KOP_SK_BYTES];
-    uint8_t kem_ct[KOP_CT_BYTES];
-    uint8_t kem_ss[KOP_SS_BYTES];
-
-    size_t j;
-
-    randombytes(sid, KOP_SID_BYTES);
-    memcpy(&(hid.sid), sid, KOP_SID_BYTES);
-    randombytes(a_x, KOP_INPUT_BYTES);
-    for (j = 0; j < KOP_INPUT_BYTES; j++) {
-        b_y[j] = a_x[j];
-    }
-    random_pk(a);
-    random_pk(b);
     for (j = 0; j < KOP_OT_N - 1; j++) {
-        random_pk(&pks[j * KOP_PK_BYTES]);
-        pks_pointers[j] = &pks[j * KOP_PK_BYTES];
+        random_pk(&pks[j]);
+        pk_pointers[j] = &pks[j];
     }
-    randombytes(prf_in, KOP_SS_BYTES + KOP_INPUT_BYTES);
+    random_pk(&a);
+    random_pk(&b);
+    randombytes(hid.sid, KOP_SID_BYTES);
+    hid.oenc = 0;
+    hid.ot = 0;
+    hid.kem = 0;
 
-    printf("%s, σ=%u, N=%u\n", XSTR(KOP_KEM_ALG), KOP_SIGMA, KOP_OT_N);
+    printf("  group: %s, N=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_N);
 
-    PRINT_TIMER_HEADER
-    TIME_OPERATION_ITERATIONS(kop_pet_alice_m0(a_sks, m0, a_x, sid), "pet_alice_m0", 1000)
-    TIME_OPERATION_ITERATIONS(kop_pet_bob_m1(b_y_b, b_sks, m1, m0, b_y, sid), "pet_bob_m1", 300)
-    TIME_OPERATION_ITERATIONS(kop_pet_alice_m2(a_x_a, m2, m1, a_sks, a_x, sid), "pet_alice_m2", 300)
-    TIME_OPERATION_ITERATIONS(kop_pet_bob_m3(m3, m2, b_sks, b_y, b_y_b), "pet_bob_m3", 1000)
-    TIME_OPERATION_ITERATIONS(kop_pet_alice_accept(m3, a_x_a), "pet_alice_accept", 1000)
+    TIME_OPERATION_ITERATIONS(add_pk(&a, &a, &b), "add", iterations)
+    TIME_OPERATION_ITERATIONS(sub_pk(&a, &a, &b), "sub", iterations)
+    TIME_OPERATION_ITERATIONS(random_pk(&a), "random", iterations)
+    TIME_OPERATION_ITERATIONS(hash_pks(&a, pk_pointers, hid), "hash", iterations)
+}
 
-    TIME_OPERATION_ITERATIONS(kop_ot_recv_init(ot_sk, ot_pks, ot_index, &hid), "ot_recv_init", 1000)
-    TIME_OPERATION_ITERATIONS(kop_ot_send(ot_sss, ot_cts, ot_pks, &hid), "ot_send", 1000)
-    TIME_OPERATION_ITERATIONS(kop_ot_recv_out(ot_ss, ot_cts, ot_sk, ot_index), "ot_recv_out", 1000)
+static void measure_kem(int iterations)
+{
+    kop_kem_pk_s pk;
+    kop_kem_sk_s sk;
+    kop_kem_ct_s ct;
+    kop_kem_ss_s s0, s1;
 
-    TIME_OPERATION_ITERATIONS(add_pk(a, a, b), "add_pk", 1000)
-    TIME_OPERATION_ITERATIONS(sub_pk(a, a, b), "sub_pk", 1000)
-    TIME_OPERATION_ITERATIONS(random_pk(a), "random_pk", 1000)
-    TIME_OPERATION_ITERATIONS(hash_pks(a, pks_pointers, &hid), "hash_pks", 1000)
+    printf("  KEM: %s\n", XSTR(KOP_KEM_ALG));
 
-    TIME_OPERATION_ITERATIONS(kop_pet_prf(prf_out, prf_in), "pet_prf", 1000)
-
-    TIME_OPERATION_ITERATIONS(KOP_KEM_KEYGEN(kem_pk, kem_sk), "kem_keygen", 1000)
-    TIME_OPERATION_ITERATIONS(KOP_KEM_ENCAPS(kem_ct, kem_ss, kem_pk), "kem_encaps", 1000)
-    TIME_OPERATION_ITERATIONS(KOP_KEM_DECAPS(kem_ss, kem_ct, kem_sk), "kem_decaps", 1000)
-    PRINT_TIMER_FOOTER
+    TIME_OPERATION_ITERATIONS(kop_kem_keygen(&pk, &sk), "keygen", iterations)
+    TIME_OPERATION_ITERATIONS(kop_kem_encaps(&ct, &s0, &pk), "encaps", iterations)
+    TIME_OPERATION_ITERATIONS(kop_kem_decaps(&s1, &ct, &sk), "decaps", iterations)
 }
 
 
-int main()
+static void measure_ot(int iterations)
 {
-    measure_timing();
+    kop_kem_ss_s secret;
+    kop_ot_recv_s recv;
+    kop_ot_send_s send;
+    kop_ot_recv_msg_s recv_msg;
+    kop_ot_send_msg_s send_msg;
+    kop_ot_index_t index;
+    hid_t hid;
+
+    randombytes(hid.sid, KOP_SID_BYTES);
+    hid.oenc = 0;
+    hid.ot = 0;
+    index = 0;
+
+    printf("  OT: %s, N=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_N);
+
+    TIME_OPERATION_ITERATIONS(kop_ot_recv_init(&recv, &recv_msg, index, hid), "recv init", iterations)
+    TIME_OPERATION_ITERATIONS(kop_ot_send(&send, &send_msg, &recv_msg, hid), "send", iterations)
+    TIME_OPERATION_ITERATIONS(kop_ot_recv_out(&secret, &send_msg, &recv), "recv out", iterations)
+}
+
+static void measure_pet(int iterations)
+{
+    uint8_t sid[KOP_SID_BYTES], input[KOP_INPUT_BYTES];
+    kop_pet_state_s alice, bob;
+    kop_pet_msg0_s msg0;
+    kop_pet_msg1_s msg1;
+    kop_pet_msg2_s msg2;
+    kop_pet_msg3_s msg3;
+
+    randombytes(sid, KOP_SID_BYTES);
+    randombytes(input, KOP_INPUT_BYTES);
+    kop_pet_init(&bob, input, sid);
+
+    printf("  PET: %s, N=%u, σ=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_N, KOP_SIGMA);
+
+    TIME_OPERATION_ITERATIONS(kop_pet_init(&alice, input, sid), "init", iterations)
+    TIME_OPERATION_ITERATIONS(kop_pet_alice_m0(&alice, &msg0), "alice m0", iterations)
+    TIME_OPERATION_ITERATIONS(kop_pet_bob_m1(&bob, &msg1, &msg0), "bob m1", iterations)
+    TIME_OPERATION_ITERATIONS(kop_pet_alice_m2(&alice, &msg2, &msg1), "alice m2", iterations)
+    TIME_OPERATION_ITERATIONS(kop_pet_bob_m3(&bob, &msg3, &msg2), "bob m3", iterations)
+    TIME_OPERATION_ITERATIONS(kop_pet_alice_accept(&alice, &msg3), "alice accept", iterations)
+}
+
+
+int main(int argc, char *argv[])
+{
+    int iterations = 1000;
+
+    if (argc >= 2) {
+        iterations = atoi(argv[1]);
+        if (iterations == 0) {
+            fprintf(stderr, "Usage: %s [nr_of_tests]\n", argv[0]);
+            return EXIT_FAILURE;
+        }
+    }
+
+    PRINT_TIMER_HEADER
+    measure_group(iterations);
+    measure_kem(iterations);
+    measure_ot(iterations);
+    measure_pet(iterations);
+    PRINT_TIMER_FOOTER
+
+    return EXIT_SUCCESS;
 }
 

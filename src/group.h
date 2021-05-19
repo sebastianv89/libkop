@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "params.h"
+#include "kem.h"
 
 /// Hash ID, used for random oracle cloning
 typedef struct {
@@ -12,9 +13,9 @@ typedef struct {
     uint8_t kem;                // kem index (0 to N)
 } hid_t;
 
-void add_pk(uint8_t r[KOP_PK_BYTES], const uint8_t a[KOP_PK_BYTES], const uint8_t b[KOP_PK_BYTES]);
-void sub_pk(uint8_t r[KOP_PK_BYTES], const uint8_t a[KOP_PK_BYTES], const uint8_t b[KOP_PK_BYTES]);
-void random_pk(uint8_t pk[KOP_PK_BYTES]);
-void hash_pks(uint8_t pk[KOP_PK_BYTES], const uint8_t * const pks[KOP_OT_N - 1], const hid_t *hid);
+void add_pk(kop_kem_pk_s *r, const kop_kem_pk_s *a, const kop_kem_pk_s *b);
+void sub_pk(kop_kem_pk_s *r, const kop_kem_pk_s *a, const kop_kem_pk_s *b);
+void random_pk(kop_kem_pk_s *r);
+void hash_pks(kop_kem_pk_s *r, const kop_kem_pk_s * const pks[KOP_OT_N - 1], hid_t hid);
 
 #endif

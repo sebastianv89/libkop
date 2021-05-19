@@ -3,15 +3,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "SimpleFIPS202.h"
+#include "KeccakHash.h"
 
 #include "pet.h"
 #include "params.h"
 #include "common.h"
+#include "group.h"
 #include "ot.h"
 
 static void words_from_bytes(
-    kop_pet_index_t words[KOP_SIGMA],
+    kop_ot_index_t words[KOP_SIGMA],
     const uint8_t bytes[KOP_INPUT_BYTES])
 {
 #if KOP_OT_LOGN == 1
@@ -157,24 +158,30 @@ static void words_from_bytes(
 
 // The PRF used in the PET.
 // buffer *in must contain (key||msg)
-void kop_pet_prf(uint8_t out[KOP_PRF_BYTES],
-             const uint8_t in[KOP_SS_BYTES + KOP_INPUT_BYTES])
+static void kop_pet_prf(
+        uint8_t out[KOP_PRF_BYTES],
+        const kop_kem_ss_s *key,
+        const uint8_t input[KOP_INPUT_BYTES])
 {
-    SHA3_256(out, in, KOP_SS_BYTES + KOP_INPUT_BYTES);
+    Keccak_HashInstance hi;   
+    Keccak_HashInitialize_SHA3_256(&hi);
+    Keccak_HashUpdate(&hi, key->bytes, KOP_SS_BYTES);
+    Keccak_HashUpdate(&hi, input, KOP_INPUT_BYTES);
+    Keccak_HashFinal(&hi, out);
 }
 
 // Initialize the receiver of oblivious encoding
 static void kop_oenc_recv_init(
-    uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
-    uint8_t pks[KOP_SIGMA * KOP_OT_N * KOP_PK_BYTES],
-    uint8_t indices[KOP_SIGMA],
-    hid_t *hid)
+    kop_ot_recv_s states[KOP_SIGMA],
+    kop_ot_recv_msg_s msgs_out[KOP_SIGMA],
+    const kop_ot_index_t indices[KOP_SIGMA],
+    hid_t hid)
 {
     size_t i;
 
     for (i = 0; i < KOP_SIGMA; i++) {
-        hid->ot = i;
-        kop_ot_recv_init(&sks[i * KOP_SK_BYTES], &pks[i * KOP_OT_N * KOP_PK_BYTES], indices[i], hid);
+        hid.ot = i;
+        kop_ot_recv_init(&states[i], &msgs_out[i], indices[i], hid);
     }
 }
 
@@ -184,28 +191,27 @@ static void kop_oenc_recv_init(
 // the encoding of the input.
 static void kop_oenc_send(
     uint8_t encoding[KOP_PRF_BYTES],
-    uint8_t cts[KOP_SIGMA * KOP_OT_N * KOP_CT_BYTES],
-    const uint8_t pks[KOP_SIGMA * KOP_OT_N * KOP_PK_BYTES],
-    const uint8_t indices[KOP_SIGMA],
+    kop_ot_send_msg_s msgs_out[KOP_SIGMA],
+    const kop_ot_recv_msg_s msgs_in[KOP_SIGMA],
+    const kop_ot_index_t indices[KOP_SIGMA],
     const uint8_t input[KOP_INPUT_BYTES],
-    hid_t *hid)
+    hid_t hid)
 {
-    uint8_t secrets[KOP_OT_N * KOP_SS_BYTES];
-    uint8_t prf_input[KOP_SS_BYTES + KOP_INPUT_BYTES];
+    kop_ot_send_s send;
+    kop_kem_ss_s secret = {0}; // prevent warnings
     uint8_t digest[KOP_PRF_BYTES];
     uint8_t b;
     size_t i, j;
 
     memset(encoding, 0, KOP_PRF_BYTES);
-    memcpy(&prf_input[KOP_SS_BYTES], input, KOP_INPUT_BYTES);
     for (i = 0; i < KOP_SIGMA; i++) {
-        hid->ot = i;
-        kop_ot_send(secrets, &cts[i * KOP_OT_N * KOP_CT_BYTES], &pks[i * KOP_OT_N * KOP_PK_BYTES], hid);
+        hid.ot = i;
+        kop_ot_send(&send, &msgs_out[i], &msgs_in[i], hid);
         for (j = 0; j < KOP_OT_N; j++) {
-            b = 1 - ((-(uint64_t)(j ^ indices[i])) >> 63);
-            cmov(prf_input, &secrets[j * KOP_SS_BYTES], KOP_SS_BYTES, b);
+            b = 1 - byte_neq(j, indices[i]);
+            cmov(secret.bytes, send.secrets[j].bytes, KOP_SS_BYTES, b);
         }
-        kop_pet_prf(digest, prf_input);
+        kop_pet_prf(digest, &secret, input);
         for (j = 0; j < KOP_PRF_BYTES; j++) {
             encoding[j] ^= digest[j];
         }
@@ -215,193 +221,114 @@ static void kop_oenc_send(
 // Get receiver output of oblivious encoding.
 static void kop_oenc_recv_out(
     uint8_t encoding[KOP_PRF_BYTES],
-    const uint8_t cts[KOP_SIGMA * KOP_OT_N * KOP_CT_BYTES],
-    const uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
-    const uint8_t indices[KOP_SIGMA],
+    const kop_ot_send_msg_s msgs_in[KOP_SIGMA],
+    const kop_ot_recv_s states[KOP_SIGMA],
     const uint8_t input[KOP_INPUT_BYTES])
 {
-    uint8_t prf_input[KOP_SS_BYTES + KOP_INPUT_BYTES];
+    kop_kem_ss_s secret;
     uint8_t digest[KOP_PRF_BYTES];
     size_t i, j;
 
     memset(encoding, 0, KOP_PRF_BYTES);
-    memcpy(&prf_input[KOP_SS_BYTES], input, KOP_INPUT_BYTES);
     for (i = 0; i < KOP_SIGMA; i++) {
-        kop_ot_recv_out(prf_input, &cts[i * KOP_OT_N * KOP_CT_BYTES], &sks[i * KOP_SK_BYTES], indices[i]);
-        kop_pet_prf(digest, prf_input);
+        kop_ot_recv_out(&secret, &msgs_in[i], &states[i]);
+        kop_pet_prf(digest, &secret, input);
         for (j = 0; j < KOP_PRF_BYTES; j++) {
             encoding[j] ^= digest[j];
         }
     }
 }
 
-/// Initialize Alice in the private equality test
-///
-/// Alice initializes the oblivious encoding Receiver with her secret `x`.
-/// She gets her secret keys and the public keys to send to Bob.
-///
-/// @param[out] sks  KOP_SIGMA secret keys, of length KOP_SK_BYTES each.
-/// @param[out] pks  (KOP_SIGMA * KOP_OT_N) public keys, of length KOP_PK_BYTES each.
-///                  Outgoing message to Bob.
-/// @param[in]  x    Alice's secret input.
+// this leaves part of the state uninitialized...
+void kop_pet_init(
+    kop_pet_state_s *state,
+    const uint8_t input[KOP_INPUT_BYTES],
+    const uint8_t sid[KOP_SID_BYTES])
+{
+    memcpy(state->hid.sid, sid, KOP_SID_BYTES);
+    memcpy(state->input, input, KOP_INPUT_BYTES);
+}
+
 void kop_pet_alice_m0(
-    uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
-    uint8_t pks[KOP_PET_MSG0_BYTES],
-    const uint8_t x[KOP_INPUT_BYTES],
-    const uint8_t sid[KOP_SID_BYTES])
+    kop_pet_state_s *state,
+    kop_pet_msg0_s *msg_out)
 {
-    uint8_t indices[KOP_SIGMA];
-    hid_t hid;
+    kop_ot_index_t indices[KOP_SIGMA];
 
-    memcpy(&(hid.sid), sid, KOP_SID_BYTES);
-    hid.oenc = 0;
-    words_from_bytes(indices, x);
-    kop_oenc_recv_init(sks, pks, indices, &hid);
+    words_from_bytes(indices, state->input);
+    state->hid.oenc = 0;
+    kop_oenc_recv_init(state->recv, msg_out->recv, indices, state->hid);
 }
 
-/// Bob processes m0 in the private equality test
-///
-/// Bob takes Alice's message and runs the oblivious encoding Sender: from his
-/// shared secrets he computes `y_b`: his secret input `y` in his encoding.
-/// Bob also initializes an oblivious encoding Receiver with his secret `y`.
-/// He gets her secret keys and public keys to send to Alice.  The outgoing
-/// message is a concatenation of his Sender ciphertext and Receiver public
-/// keys.
-///
-/// @param[out] y_b      secret encoding of `y` in Bob's encoding.
-/// @param[out] sks      KOP_SIGMA secret keys, of length KOP_SK_BYTES each.
-/// @param[out] msg_out  (KOP_SIGMA * KOP_OT_N) ciphertexts, of length KOP_CT_BYTES each.
-///                      Concatenated with (KOP_SIGMA * KOP_OT_N) public keys, of length KOP_PK_BYTES each.
-///                      Outgoing message to Alice.
-/// @param[in]  pks_in   Incoming message from Alice, output of `pet_alice_m0`.
-/// @param[in]  y        Bob's secret input, of length KOP_INPUT_BYTES
 void kop_pet_bob_m1(
-    uint8_t y_b[KOP_PRF_BYTES],
-    uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
-    uint8_t msg_out[KOP_PET_MSG1_BYTES],
-    const uint8_t pks_in[KOP_PET_MSG0_BYTES],
-    const uint8_t y[KOP_INPUT_BYTES],
-    const uint8_t sid[KOP_SID_BYTES])
+    kop_pet_state_s *state,
+    kop_pet_msg1_s *msg_out,
+    const kop_pet_msg0_s *msg_in)
 {
-    uint8_t indices[KOP_SIGMA];
-    uint8_t y_local[KOP_INPUT_BYTES];
-    uint8_t y_b_local[KOP_PRF_BYTES];
-    uint8_t cts[KOP_SIGMA * KOP_OT_N * KOP_CT_BYTES];
-    uint8_t *pks_out = &msg_out[KOP_SIGMA * KOP_OT_N * KOP_CT_BYTES];
-    hid_t hid;
-
-    memcpy(&(hid.sid), sid, KOP_SID_BYTES);
-    memcpy(y_local, y, KOP_INPUT_BYTES);
-    words_from_bytes(indices, y);
-    hid.oenc = 0;
-    kop_oenc_send(y_b_local, cts, pks_in, indices, y, &hid);
-    hid.oenc = 1;
-    kop_oenc_recv_init(sks, pks_out, indices, &hid);
-    memcpy(y_b, y_b_local, KOP_PRF_BYTES);
-    memcpy(msg_out, cts, KOP_SIGMA * KOP_OT_N * KOP_CT_BYTES);
+    kop_ot_index_t indices[KOP_SIGMA];
+    
+    words_from_bytes(indices, state->input);
+    state->hid.oenc = 0;
+    kop_oenc_send(state->encoding, msg_out->send, msg_in->recv, indices, state->input, state->hid);
+    // state->encoding == B[y]
+    state->hid.oenc = 1;
+    kop_oenc_recv_init(state->recv, msg_out->recv, indices, state->hid);
 }
 
-/// Alice processes m1 in the private equality test.
-///
-/// Alice takes Bob's message. As oblivious encoding Receiver, she learns
-/// `x_b`: her secret input `x` in his encoding.  As oblivious encoding Sender:
-/// from her shared secrets she computes `x_a`: her secret input `x` in her
-/// encoding.  The outgoing message consists of the common encoding and the
-/// oblivious encoding ciphertexts.
-///
-/// @param[out] x_a      Secret encoding of `x` in Alice's encoding.
-/// @param[out] msg_out  Common encoding `x_a ^ x_b`, of length KOP_PRF_BYTES.
-///                      Concatenated with (KOP_SIGMA * KOP_OT_N) ciphertexts, of length KOP_CT_BYTES each.
-///                      Outgoing message to Bob.
-/// @param[in]  msg_in   Incoming message from Bob, output of `pet_bob_m1`.
-/// @param[in]  sks      Alice's secret keys, output of `pet_alice_m0`.
-/// @param[in]  x        Alice's secret input, of length KOP_INPUT_BYTES.
 void kop_pet_alice_m2(
-    uint8_t x_a[KOP_PRF_BYTES],
-    uint8_t msg_out[KOP_PET_MSG2_BYTES],
-    const uint8_t msg_in[KOP_PET_MSG1_BYTES],
-    const uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
-    const uint8_t x[KOP_INPUT_BYTES],
-    const uint8_t sid[KOP_SID_BYTES])
+    kop_pet_state_s *state,
+    kop_pet_msg2_s *msg_out,
+    const kop_pet_msg1_s *msg_in)
 {
-    uint8_t indices[KOP_SIGMA];
-    uint8_t x_a_local[KOP_PRF_BYTES];
-    uint8_t x_b[KOP_PRF_BYTES] = {0};
-    uint8_t cts_out[KOP_SIGMA * KOP_OT_N * KOP_CT_BYTES];
-    const uint8_t *cts_in = msg_in;
-    const uint8_t *pks_in = &msg_in[KOP_SIGMA * KOP_OT_N * KOP_CT_BYTES];
-    hid_t hid;
+    kop_ot_index_t indices[KOP_SIGMA];
+    uint8_t encoding[KOP_PRF_BYTES];
     size_t i;
 
-    memcpy(&(hid.sid), sid, KOP_SID_BYTES);
-    words_from_bytes(indices, x);
-    kop_oenc_recv_out(x_b, cts_in, sks, indices, x);
-    hid.oenc = 1;
-    kop_oenc_send(x_a_local, cts_out, pks_in, indices, x, &hid);
-
-    memcpy(x_a, x_a_local, KOP_PRF_BYTES);
-    for (i = 0; i < KOP_PRF_BYTES; i++) {
-        msg_out[i] = x_a_local[i] ^ x_b[i];
+    state->hid.oenc = 0;
+    kop_oenc_recv_out(encoding, msg_in->send, state->recv, state->input);
+    // encoding == B[x]
+    for (i = 0; i < KOP_SIGMA; i++) {
+        indices[i] = state->recv[i].index;
     }
-    memcpy(&msg_out[KOP_PRF_BYTES], cts_out, KOP_SIGMA * KOP_OT_N * KOP_CT_BYTES);
+    state->hid.oenc = 1;
+    kop_oenc_send(state->encoding, msg_out->send, msg_in->recv, indices, state->input, state->hid);
+    // state->encoding == A[x]
+    for (i = 0; i < KOP_PRF_BYTES; i++) {
+        msg_out->encoding[i] = encoding[i] ^ state->encoding[i];
+    }
+    // msg_out->encoding == A[x] ^ B[x]
 }
 
-/// Bob processes m2 in the private equality test. Returns boolean value (0 or
-/// 1) indicating if x==y.
-///
-/// Bob takes Alice's message. He computes `y_a`: his secret input `y`
-/// in her encoding, from which he can compute the shared encoding `y_a ^ y_b`.
-/// He compares this to the encoding she sent. If they are unequal, he aborts.
-/// (Optional: send a message to Alice to let her know `x != y`.)
-/// Otherwise (x equals y) he sends `y_a` to Alice.
-///
-/// @param[out] y_a      Secret encoding of `y` in Bob's encoding.
-///                      If the function returns 1, this is the outgoing message to Alice.
-/// @param[in]  msg_in   Incoming message from Alice, output of `pet_alice_m2`.
-/// @param[in]  sks      Bob's secret keys, output of `pet_bob_m1`.
-/// @param[in]  y        Bob's secret input `y`, of length KOP_INPUT_BYTES.
-/// @param[in]  y_b      Secret encoding of `y` in Bob's encoding, output of `pet_bob_m1`.
-///
-/// @return     if `x == y` then return 1, otherwise return 0.
 int kop_pet_bob_m3(
-    uint8_t y_a[KOP_PET_MSG3_BYTES],
-    const uint8_t msg_in[KOP_PET_MSG2_BYTES],
-    const uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
-    const uint8_t y[KOP_INPUT_BYTES],
-    const uint8_t y_b[KOP_PRF_BYTES])
+    kop_pet_state_s *state,
+    kop_pet_msg3_s *msg_out,
+    const kop_pet_msg2_s *msg_in)
 {
-    uint8_t y_a_local[KOP_PRF_BYTES];
-    uint8_t y_ab[KOP_PRF_BYTES];
-    uint8_t indices[KOP_SIGMA];
-    const uint8_t *x_ab = msg_in;
-    const uint8_t *cts_in = &msg_in[KOP_PRF_BYTES];
+    uint8_t encoding_out[KOP_PRF_BYTES];
     size_t i;
 
-    words_from_bytes(indices, y);
-    kop_oenc_recv_out(y_a_local, cts_in, sks, indices, y);
+    // state->encoding == B[y]
+    state->hid.oenc = 1;
+    kop_oenc_recv_out(encoding_out, msg_in->send, state->recv, state->input);
+    // encoding_out == A[y]
     for (i = 0; i < KOP_PRF_BYTES; i++) {
-        y_ab[i] = y_a_local[i] ^ y_b[i];
+        state->encoding[i] ^= encoding_out[i];
     }
-    if (verify(x_ab, y_ab, KOP_PRF_BYTES) != 0) {
+    // state->encoding == A[y] ^ B[y]
+    // msg_in->encoding == A[x] ^ B[x]
+    if (verify(state->encoding, msg_in->encoding, KOP_PRF_BYTES) != 0) {
+        // memset(msg_out->encoding, 0, KOP_PRF_BYTES); // prevents outputting an uninitialized value
         return 0;
     }
-    memcpy(y_a, y_a_local, KOP_PRF_BYTES);
+    memcpy(msg_out->encoding, encoding_out, KOP_PRF_BYTES);
+    // msg_out->encoding == A[y]
     return 1;
 }
 
-/// Alice completes the private equality test. Returns boolean value (0 or
-/// 1) indicating if x==y.
-///
-/// Alice takes Bob's message `y_a` and compares his encoding with her stored
-/// encoding.
-///
-/// @param[in]  y_a  Bob's message, output of `pet_bob_m3`.
-/// @param[in]  x_a  Secret encoding of `x` in Alice's encoding, output of `pet_alice_m2`.
-/// @return     if `x == y` then return 1, otherwise return 0.
 int kop_pet_alice_accept(
-    const uint8_t y_a[KOP_PET_MSG3_BYTES],
-    const uint8_t x_a[KOP_PRF_BYTES])
+    kop_pet_state_s *state,
+    const kop_pet_msg3_s *msg_in)
 {
-    return 1 - verify(x_a, y_a, 32);
+    return 1 - verify(state->encoding, msg_in->encoding, KOP_PRF_BYTES);
 }
 

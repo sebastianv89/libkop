@@ -35,8 +35,6 @@
 #define KOP_CT_BYTES KOP_KEM_namespace(length_ciphertext)
 #define KOP_SS_BYTES KOP_KEM_namespace(length_shared_secret)
 
-#define randombytes OQS_randombytes
-
 #define KOP_OT_N (1 << KOP_OT_LOGN)
 #if KOP_OT_LOGN > 8
 #error large N not (yet?) supported

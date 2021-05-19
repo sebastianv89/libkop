@@ -7,6 +7,8 @@
 
 #include "group.h"
 #include "params.h"
+#include "kem.h"
+#include "randombytes.h"
 
 ///////
 /// The following is mostly duplicated from Crystals/Kyber768 code.
@@ -236,96 +238,70 @@ static void gen_polyvec(polyvec *a, const uint8_t seed[KYBER_SYMBYTES])
     }
 }
 
-/// r = a + b
-///
-/// Group addition of public keys
-///
-/// @param[out] r  resulting sum (of length KOP_PK_BYTES)
-/// @param[in]  a  first sum input (of length KOP_PK_BYTES)
-/// @param[in]  b  second sum input (of length KOP_PK_BYTES)
-void add_pk(uint8_t r[KOP_PK_BYTES], const uint8_t a[KOP_PK_BYTES], const uint8_t b[KOP_PK_BYTES])
+void add_pk(kop_kem_pk_s *r, const kop_kem_pk_s *a, const kop_kem_pk_s *b)
 {
     size_t i;
     polyvec ta, tb;
     uint8_t rhoa[KYBER_SYMBYTES], rhob[KYBER_SYMBYTES];
 
-    unpack_pk(&ta, rhoa, a);
-    unpack_pk(&tb, rhob, b);
+    unpack_pk(&ta, rhoa, a->bytes);
+    unpack_pk(&tb, rhob, b->bytes);
     polyvec_add(&ta, &ta, &tb);
     polyvec_reduce(&ta);
     for (i = 0; i < KYBER_SYMBYTES; i++) {
         rhoa[i] ^= rhob[i];
     }
-    pack_pk(r, &ta, rhoa);
+    pack_pk(r->bytes, &ta, rhoa);
 }
 
-/// r = a - b
-///
-/// Group subtraction of public keys
-///
-/// @param[out] r  resulting difference (of length KOP_PK_BYTES)
-/// @param[in]  a  minuend (of length KOP_PK_BYTES)
-/// @param[in]  b  subtrahend (of length KOP_PK_BYTES)
-void sub_pk(uint8_t r[KOP_PK_BYTES], const uint8_t a[KOP_PK_BYTES], const uint8_t b[KOP_PK_BYTES])
+void sub_pk(kop_kem_pk_s *r, const kop_kem_pk_s *a, const kop_kem_pk_s *b)
 {
     size_t i;
     polyvec ta, tb;
     uint8_t rhoa[KYBER_SYMBYTES], rhob[KYBER_SYMBYTES];
 
-    unpack_pk(&ta, rhoa, a);
-    unpack_pk(&tb, rhob, b);
+    unpack_pk(&ta, rhoa, a->bytes);
+    unpack_pk(&tb, rhob, b->bytes);
     polyvec_sub(&ta, &ta, &tb);
     polyvec_reduce(&ta);
     for (i = 0; i < KYBER_SYMBYTES; i++) {
         rhoa[i] ^= rhob[i];
     }
-    pack_pk(r, &ta, rhoa);
+    pack_pk(r->bytes, &ta, rhoa);
 }
 
 // Expand a seed into a public key: generate polynomial
-static void gen_pk(uint8_t pk[KOP_PK_BYTES], const uint8_t seed[2 * KYBER_SYMBYTES])
+static void gen_pk(kop_kem_pk_s *r, const uint8_t seed[2 * KYBER_SYMBYTES])
 {
     polyvec a;
 
     gen_polyvec(&a, seed);
-    pack_pk(pk, &a, &seed[KYBER_SYMBYTES]);
+    pack_pk(r->bytes, &a, &seed[KYBER_SYMBYTES]);
 }
 
-/// Generate a random public key
-///
-/// Generates a random seed, then expands that into a public key.
-///
-/// @param[out] pk resulting public key (of length KOP_PK_BYTES)
-void random_pk(uint8_t pk[KOP_PK_BYTES])
+void random_pk(kop_kem_pk_s *r)
 {
     uint8_t seed[2 * KYBER_SYMBYTES];
 
     randombytes(seed, 2 * KYBER_SYMBYTES);
-    gen_pk(pk, seed);
+    gen_pk(r, seed);
 }
 
-/// Hash public keys into a new public key
-///
-/// Hashes input public keys to a seed, then generates a new public key from that seed.
-///
-/// @param[out] pk   resulting public key (of length KOP_PK_BYTES)
-/// @param[in]  pks  (KOP_OT_N - 1) public keys (each of length KOP_PK_BYTES)
-/// @param[in]  hid  unique identifier, ensures domain separation
-void hash_pks(uint8_t pk[KOP_PK_BYTES], const uint8_t * const pks[KOP_OT_N - 1], const hid_t *hid)
+void hash_pks(kop_kem_pk_s *r, const kop_kem_pk_s * const pks[KOP_OT_N - 1], hid_t hid)
 {
-    Keccak_HashInstance khi;
+    Keccak_HashInstance hi;
     uint8_t digest[64];
     size_t i;
 
-    Keccak_HashInitialize_SHA3_512(&khi);
-    Keccak_HashUpdate(&khi, hid->sid, 8 * KOP_SID_BYTES);
-    Keccak_HashUpdate(&khi, &hid->oenc, 8);
-    Keccak_HashUpdate(&khi, &hid->ot, 8);
-    Keccak_HashUpdate(&khi, &hid->kem, 8);
+    Keccak_HashInitialize_SHA3_512(&hi);
+    Keccak_HashUpdate(&hi, hid.sid, 8 * KOP_SID_BYTES);
+    Keccak_HashUpdate(&hi, &hid.oenc, 8);
+    Keccak_HashUpdate(&hi, &hid.ot, 8);
+    Keccak_HashUpdate(&hi, &hid.kem, 8);
     for (i = 0; i < KOP_OT_N - 1; i++) {
-        Keccak_HashUpdate(&khi, pks[i], KOP_PK_BYTES);
+        Keccak_HashUpdate(&hi, pks[i]->bytes, KOP_PK_BYTES);
     }
-    Keccak_HashFinal(&khi, digest);
-    gen_pk(pk, digest);
+    Keccak_HashFinal(&hi, digest);
+    gen_pk(r, digest);
 }
 

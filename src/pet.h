@@ -5,43 +5,61 @@
 #include <stdint.h>
 
 #include "params.h"
+#include "group.h"
+#include "ot.h"
 
-// TODO work with structs instead of concatenated byte-arrays
+typedef struct {
+    hid_t hid;
+    uint8_t input[KOP_INPUT_BYTES];
+    kop_ot_recv_s recv[KOP_SIGMA]; // might save some space by dynamically allocating this
+    uint8_t encoding[KOP_PRF_BYTES];
+} kop_pet_state_s;
 
-// not static: want to benchmark this, but this is not part of the API
-void kop_pet_prf(uint8_t out[KOP_PRF_BYTES], const uint8_t in[KOP_SS_BYTES + KOP_INPUT_BYTES]);
+typedef struct {
+    kop_ot_recv_msg_s recv[KOP_SIGMA];
+} kop_pet_msg0_s;
+
+typedef struct {
+    kop_ot_send_msg_s send[KOP_SIGMA];
+    kop_ot_recv_msg_s recv[KOP_SIGMA];
+} kop_pet_msg1_s;
+
+typedef struct {
+    kop_ot_send_msg_s send[KOP_SIGMA];
+    uint8_t encoding[KOP_PRF_BYTES];
+} kop_pet_msg2_s;
+
+typedef struct {
+    uint8_t encoding[KOP_PRF_BYTES];
+} kop_pet_msg3_s;
+
+
+void kop_pet_init(
+    kop_pet_state_s *state,
+    const uint8_t input[KOP_INPUT_BYTES],
+    const uint8_t sid[KOP_SID_BYTES]);
 
 void kop_pet_alice_m0(
-    uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
-    uint8_t pks[KOP_PET_MSG0_BYTES],
-    const uint8_t x[KOP_INPUT_BYTES],
-    const uint8_t sid[KOP_SID_BYTES]);
+    kop_pet_state_s *state,
+    kop_pet_msg0_s *msg_out);
 
 void kop_pet_bob_m1(
-    uint8_t y_b[KOP_PRF_BYTES],
-    uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
-    uint8_t msg_out[KOP_PET_MSG1_BYTES],
-    const uint8_t pks_in[KOP_PET_MSG0_BYTES],
-    const uint8_t y[KOP_INPUT_BYTES],
-    const uint8_t sid[KOP_SID_BYTES]);
+    kop_pet_state_s *state,
+    kop_pet_msg1_s *msg_out,
+    const kop_pet_msg0_s *msg_in);
 
 void kop_pet_alice_m2(
-    uint8_t x_a[KOP_PRF_BYTES],
-    uint8_t msg_out[KOP_PET_MSG2_BYTES],
-    const uint8_t msg_in[KOP_PET_MSG1_BYTES],
-    const uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
-    const uint8_t x[KOP_INPUT_BYTES],
-    const uint8_t sid[KOP_SID_BYTES]);
+    kop_pet_state_s *state,
+    kop_pet_msg2_s *msg_out,
+    const kop_pet_msg1_s *msg_in);
 
 int kop_pet_bob_m3(
-    uint8_t y_a[KOP_PET_MSG3_BYTES],
-    const uint8_t msg_in[KOP_PET_MSG2_BYTES],
-    const uint8_t sks[KOP_SIGMA * KOP_SK_BYTES],
-    const uint8_t y[KOP_INPUT_BYTES],
-    const uint8_t y_b[KOP_PRF_BYTES]);
+    kop_pet_state_s *state,
+    kop_pet_msg3_s *msg_out,
+    const kop_pet_msg2_s *msg_in);
 
 int kop_pet_alice_accept(
-    const uint8_t y_a[KOP_PET_MSG3_BYTES],
-    const uint8_t x_a[KOP_PRF_BYTES]);
+    kop_pet_state_s *state,
+    const kop_pet_msg3_s *msg_in);
 
 #endif
