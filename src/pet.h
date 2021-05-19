@@ -39,26 +39,26 @@ void kop_pet_init(
     const uint8_t input[KOP_INPUT_BYTES],
     const uint8_t sid[KOP_SID_BYTES]);
 
-void kop_pet_alice_m0(
+kop_result_e kop_pet_alice_m0(
     kop_pet_state_s *state,
     kop_pet_msg0_s *msg_out);
 
-void kop_pet_bob_m1(
+kop_result_e kop_pet_bob_m1(
     kop_pet_state_s *state,
     kop_pet_msg1_s *msg_out,
     const kop_pet_msg0_s *msg_in);
 
-void kop_pet_alice_m2(
+kop_result_e kop_pet_alice_m2(
     kop_pet_state_s *state,
     kop_pet_msg2_s *msg_out,
     const kop_pet_msg1_s *msg_in);
 
-int kop_pet_bob_m3(
+kop_result_e kop_pet_bob_m3(
     kop_pet_state_s *state,
     kop_pet_msg3_s *msg_out,
     const kop_pet_msg2_s *msg_in);
 
-int kop_pet_alice_accept(
+kop_result_e kop_pet_alice_accept(
     kop_pet_state_s *state,
     const kop_pet_msg3_s *msg_in);
 

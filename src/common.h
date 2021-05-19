@@ -4,6 +4,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define KOP_RES(call) ({\
+    res = call;\
+    if (res != KOP_RESULT_OK) {\
+        return res;\
+    }\
+    })
+
 uint8_t byte_neq(uint8_t a, uint8_t b);
 int verify(const uint8_t *a, const uint8_t *b, size_t len);
 void cmov(uint8_t *r, const uint8_t *x, size_t len, uint8_t b);

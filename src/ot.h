@@ -28,19 +28,19 @@ typedef struct {
 } kop_ot_send_msg_s;
 
 
-void kop_ot_recv_init(
+kop_result_e kop_ot_recv_init(
     kop_ot_recv_s *state,
     kop_ot_recv_msg_s *msg_out,
     kop_ot_index_t index,
     hid_t hid);
 
-void kop_ot_send(
+kop_result_e kop_ot_send(
     kop_ot_send_s *state,
     kop_ot_send_msg_s *msg_out,
     const kop_ot_recv_msg_s *msg_in,
     hid_t hid);
 
-void kop_ot_recv_out(
+kop_result_e kop_ot_recv_out(
     kop_kem_ss_s *secret,
     const kop_ot_send_msg_s *msg_in,
     const kop_ot_recv_s *state_in);

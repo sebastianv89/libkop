@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "params.h"
 #include "kem.h"
+#include "types.h"
 
 /// Hash ID, used for random oracle cloning
 typedef struct {
@@ -15,7 +16,7 @@ typedef struct {
 
 void add_pk(kop_kem_pk_s *r, const kop_kem_pk_s *a, const kop_kem_pk_s *b);
 void sub_pk(kop_kem_pk_s *r, const kop_kem_pk_s *a, const kop_kem_pk_s *b);
-void random_pk(kop_kem_pk_s *r);
-void hash_pks(kop_kem_pk_s *r, const kop_kem_pk_s * const pks[KOP_OT_N - 1], hid_t hid);
+kop_result_e random_pk(kop_kem_pk_s *r);
+kop_result_e hash_pks(kop_kem_pk_s *r, const kop_kem_pk_s * const pks[KOP_OT_N - 1], hid_t hid);
 
 #endif

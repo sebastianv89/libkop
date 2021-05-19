@@ -6,6 +6,7 @@
 #include "KeccakHash.h"
 
 #include "group.h"
+#include "common.h"
 #include "params.h"
 #include "kem.h"
 #include "randombytes.h"
@@ -218,24 +219,44 @@ static void polyvec_sub(polyvec *r, const polyvec *a, const polyvec *b)
 #define SHAKE128_BYTERATE 168
 #define REJ_SAMPLE_BLOCKS ((12*KYBER_N/8*(1 << 12) / KYBER_Q + SHAKE128_BYTERATE)/SHAKE128_BYTERATE)
 #define REJ_SAMPLE_BYTES (REJ_SAMPLE_BLOCKS * SHAKE128_BYTERATE)
-static void gen_polyvec(polyvec *a, const uint8_t seed[KYBER_SYMBYTES])
+static kop_result_e gen_polyvec(polyvec *a, const uint8_t seed[KYBER_SYMBYTES])
 {
     size_t ctr, i;
     uint8_t buf[REJ_SAMPLE_BYTES];
+    HashReturn hr;
     Keccak_HashInstance khi;
 
     for (i = 0; i < KYBER_K; i++) {
-        Keccak_HashInitialize_SHAKE128(&khi);
-        Keccak_HashUpdate(&khi, seed, 8 * KYBER_SYMBYTES);
-        Keccak_HashUpdate(&khi, (uint8_t *)(&i), 8);
-        Keccak_HashFinal(&khi, NULL);
-        Keccak_HashSqueeze(&khi, buf, 8 * REJ_SAMPLE_BYTES);
+        hr = Keccak_HashInitialize_SHAKE128(&khi);
+        if (hr != KECCAK_SUCCESS) {
+            return KOP_RESULT_ERROR;
+        }
+        hr = Keccak_HashUpdate(&khi, seed, 8 * KYBER_SYMBYTES);
+        if (hr != KECCAK_SUCCESS) {
+            return KOP_RESULT_ERROR;
+        }
+        hr = Keccak_HashUpdate(&khi, (uint8_t *)(&i), 8);
+        if (hr != KECCAK_SUCCESS) {
+            return KOP_RESULT_ERROR;
+        }
+        hr = Keccak_HashFinal(&khi, NULL);
+        if (hr != KECCAK_SUCCESS) {
+            return KOP_RESULT_ERROR;
+        }
+        hr = Keccak_HashSqueeze(&khi, buf, 8 * REJ_SAMPLE_BYTES);
+        if (hr != KECCAK_SUCCESS) {
+            return KOP_RESULT_ERROR;
+        }
         ctr = rej_uniform(a->vec[i].coeffs, KYBER_N, buf, REJ_SAMPLE_BYTES);
         while (ctr < KYBER_N) {
-            Keccak_HashSqueeze(&khi, buf, 8 * SHAKE128_BYTERATE);
+            hr = Keccak_HashSqueeze(&khi, buf, 8 * SHAKE128_BYTERATE);
+            if (hr != KECCAK_SUCCESS) {
+                return KOP_RESULT_ERROR;
+            }
             ctr += rej_uniform(a->vec[i].coeffs + ctr, KYBER_N - ctr, buf, SHAKE128_BYTERATE);
         }
     }
+    return KOP_RESULT_OK;
 }
 
 void add_pk(kop_kem_pk_s *r, const kop_kem_pk_s *a, const kop_kem_pk_s *b)
@@ -271,37 +292,61 @@ void sub_pk(kop_kem_pk_s *r, const kop_kem_pk_s *a, const kop_kem_pk_s *b)
 }
 
 // Expand a seed into a public key: generate polynomial
-static void gen_pk(kop_kem_pk_s *r, const uint8_t seed[2 * KYBER_SYMBYTES])
+static kop_result_e gen_pk(kop_kem_pk_s *r, const uint8_t seed[2 * KYBER_SYMBYTES])
 {
     polyvec a;
+    kop_result_e res;
 
-    gen_polyvec(&a, seed);
+    KOP_RES(gen_polyvec(&a, seed));
     pack_pk(r->bytes, &a, &seed[KYBER_SYMBYTES]);
+    return KOP_RESULT_OK;
 }
 
-void random_pk(kop_kem_pk_s *r)
+kop_result_e random_pk(kop_kem_pk_s *r)
 {
     uint8_t seed[2 * KYBER_SYMBYTES];
 
     randombytes(seed, 2 * KYBER_SYMBYTES);
-    gen_pk(r, seed);
+    return gen_pk(r, seed);
 }
 
-void hash_pks(kop_kem_pk_s *r, const kop_kem_pk_s * const pks[KOP_OT_N - 1], hid_t hid)
+kop_result_e hash_pks(kop_kem_pk_s *r, const kop_kem_pk_s * const pks[KOP_OT_N - 1], hid_t hid)
 {
+    HashReturn hr;
     Keccak_HashInstance hi;
     uint8_t digest[64];
     size_t i;
 
-    Keccak_HashInitialize_SHA3_512(&hi);
-    Keccak_HashUpdate(&hi, hid.sid, 8 * KOP_SID_BYTES);
-    Keccak_HashUpdate(&hi, &hid.oenc, 8);
-    Keccak_HashUpdate(&hi, &hid.ot, 8);
-    Keccak_HashUpdate(&hi, &hid.kem, 8);
-    for (i = 0; i < KOP_OT_N - 1; i++) {
-        Keccak_HashUpdate(&hi, pks[i]->bytes, KOP_PK_BYTES);
+    hr = Keccak_HashInitialize_SHA3_512(&hi);
+    if (hr != KECCAK_SUCCESS) {
+        return KOP_RESULT_ERROR;
     }
-    Keccak_HashFinal(&hi, digest);
-    gen_pk(r, digest);
+    hr = Keccak_HashUpdate(&hi, hid.sid, 8 * KOP_SID_BYTES);
+    if (hr != KECCAK_SUCCESS) {
+        return KOP_RESULT_ERROR;
+    }
+    hr = Keccak_HashUpdate(&hi, &hid.oenc, 8);
+    if (hr != KECCAK_SUCCESS) {
+        return KOP_RESULT_ERROR;
+    }
+    hr = Keccak_HashUpdate(&hi, &hid.ot, 8);
+    if (hr != KECCAK_SUCCESS) {
+        return KOP_RESULT_ERROR;
+    }
+    hr = Keccak_HashUpdate(&hi, &hid.kem, 8);
+    if (hr != KECCAK_SUCCESS) {
+        return KOP_RESULT_ERROR;
+    }
+    for (i = 0; i < KOP_OT_N - 1; i++) {
+        hr = Keccak_HashUpdate(&hi, pks[i]->bytes, KOP_PK_BYTES);
+        if (hr != KECCAK_SUCCESS) {
+            return KOP_RESULT_ERROR;
+        }
+    }
+    hr = Keccak_HashFinal(&hi, digest);
+    if (hr != KECCAK_SUCCESS) {
+        return KOP_RESULT_ERROR;
+    }
+    return gen_pk(r, digest);
 }
 

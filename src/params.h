@@ -39,7 +39,6 @@
 #if KOP_OT_LOGN > 8
 #error large N not (yet?) supported
 #endif
-typedef uint8_t kop_pet_index_t;
 #define KOP_SIGMA ((KOP_INPUT_BYTES * 8 + KOP_OT_LOGN - 1) / KOP_OT_LOGN)
 
 #define KOP_PRF_BYTES 32

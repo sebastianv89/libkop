@@ -1,12 +1,12 @@
 CC ?= /usr/bin/cc
 CFLAGS += -O3 -DNDEBUG -march=native -fomit-frame-pointer \
 	  -Wall -Wextra -Wmissing-prototypes -Wredundant-decls -Wshadow -Wpointer-arith \
-	  -I./xkcp/libXKCP.a.headers
+	  -I./xkcp/libXKCP.a.headers $(EXTRAFLAGS)
 LIBS = -L./xkcp -lXKCP -loqs
 RM = /bin/rm
 TESTFLAGS = -gdwarf-4 -O0 -UNDEBUG -march=native \
 	    -Wall -Wextra -Wmissing-prototypes -Wredundant-decls -Wshadow -Wpointer-arith \
-	    -I./xkcp/libXKCP.a.headers
+	    -I./xkcp/libXKCP.a.headers $(EXTRAFLAGS)
 TESTS = test_group test_kem test_ot test_pet test_speed
 
 # TODO: implement a way to automatically compile libXKCP

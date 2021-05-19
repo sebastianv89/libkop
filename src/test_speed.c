@@ -16,7 +16,7 @@
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
-static void measure_group(int iterations) {
+static void measure_group(float seconds) {
     kop_kem_pk_s a, b, pks[KOP_OT_N - 1];
     const kop_kem_pk_s * pk_pointers[KOP_OT_N - 1];
     size_t j;
@@ -35,13 +35,13 @@ static void measure_group(int iterations) {
 
     printf("  group: %s, N=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_N);
 
-    TIME_OPERATION_ITERATIONS(add_pk(&a, &a, &b), "add", iterations)
-    TIME_OPERATION_ITERATIONS(sub_pk(&a, &a, &b), "sub", iterations)
-    TIME_OPERATION_ITERATIONS(random_pk(&a), "random", iterations)
-    TIME_OPERATION_ITERATIONS(hash_pks(&a, pk_pointers, hid), "hash", iterations)
+    TIME_OPERATION_SECONDS(add_pk(&a, &a, &b), "add", seconds)
+    TIME_OPERATION_SECONDS(sub_pk(&a, &a, &b), "sub", seconds)
+    TIME_OPERATION_SECONDS(random_pk(&a), "random", seconds)
+    TIME_OPERATION_SECONDS(hash_pks(&a, pk_pointers, hid), "hash", seconds)
 }
 
-static void measure_kem(int iterations)
+static void measure_kem(float seconds)
 {
     kop_kem_pk_s pk;
     kop_kem_sk_s sk;
@@ -50,13 +50,13 @@ static void measure_kem(int iterations)
 
     printf("  KEM: %s\n", XSTR(KOP_KEM_ALG));
 
-    TIME_OPERATION_ITERATIONS(kop_kem_keygen(&pk, &sk), "keygen", iterations)
-    TIME_OPERATION_ITERATIONS(kop_kem_encaps(&ct, &s0, &pk), "encaps", iterations)
-    TIME_OPERATION_ITERATIONS(kop_kem_decaps(&s1, &ct, &sk), "decaps", iterations)
+    TIME_OPERATION_SECONDS(kop_kem_keygen(&pk, &sk), "keygen", seconds)
+    TIME_OPERATION_SECONDS(kop_kem_encaps(&ct, &s0, &pk), "encaps", seconds)
+    TIME_OPERATION_SECONDS(kop_kem_decaps(&s1, &ct, &sk), "decaps", seconds)
 }
 
 
-static void measure_ot(int iterations)
+static void measure_ot(float seconds)
 {
     kop_kem_ss_s secret;
     kop_ot_recv_s recv;
@@ -73,12 +73,12 @@ static void measure_ot(int iterations)
 
     printf("  OT: %s, N=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_N);
 
-    TIME_OPERATION_ITERATIONS(kop_ot_recv_init(&recv, &recv_msg, index, hid), "recv init", iterations)
-    TIME_OPERATION_ITERATIONS(kop_ot_send(&send, &send_msg, &recv_msg, hid), "send", iterations)
-    TIME_OPERATION_ITERATIONS(kop_ot_recv_out(&secret, &send_msg, &recv), "recv out", iterations)
+    TIME_OPERATION_SECONDS(kop_ot_recv_init(&recv, &recv_msg, index, hid), "recv init", seconds)
+    TIME_OPERATION_SECONDS(kop_ot_send(&send, &send_msg, &recv_msg, hid), "send", seconds)
+    TIME_OPERATION_SECONDS(kop_ot_recv_out(&secret, &send_msg, &recv), "recv out", seconds)
 }
 
-static void measure_pet(int iterations)
+static void measure_pet(float seconds)
 {
     uint8_t sid[KOP_SID_BYTES], input[KOP_INPUT_BYTES];
     kop_pet_state_s alice, bob;
@@ -93,32 +93,32 @@ static void measure_pet(int iterations)
 
     printf("  PET: %s, N=%u, σ=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_N, KOP_SIGMA);
 
-    TIME_OPERATION_ITERATIONS(kop_pet_init(&alice, input, sid), "init", iterations)
-    TIME_OPERATION_ITERATIONS(kop_pet_alice_m0(&alice, &msg0), "alice m0", iterations)
-    TIME_OPERATION_ITERATIONS(kop_pet_bob_m1(&bob, &msg1, &msg0), "bob m1", iterations)
-    TIME_OPERATION_ITERATIONS(kop_pet_alice_m2(&alice, &msg2, &msg1), "alice m2", iterations)
-    TIME_OPERATION_ITERATIONS(kop_pet_bob_m3(&bob, &msg3, &msg2), "bob m3", iterations)
-    TIME_OPERATION_ITERATIONS(kop_pet_alice_accept(&alice, &msg3), "alice accept", iterations)
+    TIME_OPERATION_SECONDS(kop_pet_init(&alice, input, sid), "init", seconds)
+    TIME_OPERATION_SECONDS(kop_pet_alice_m0(&alice, &msg0), "alice m0", seconds)
+    TIME_OPERATION_SECONDS(kop_pet_bob_m1(&bob, &msg1, &msg0), "bob m1", seconds)
+    TIME_OPERATION_SECONDS(kop_pet_alice_m2(&alice, &msg2, &msg1), "alice m2", seconds)
+    TIME_OPERATION_SECONDS(kop_pet_bob_m3(&bob, &msg3, &msg2), "bob m3", seconds)
+    TIME_OPERATION_SECONDS(kop_pet_alice_accept(&alice, &msg3), "alice accept", seconds)
 }
 
 
 int main(int argc, char *argv[])
 {
-    int iterations = 1000;
+    float seconds = 1.5;
 
     if (argc >= 2) {
-        iterations = atoi(argv[1]);
-        if (iterations == 0) {
+        seconds = atof(argv[1]);
+        if (seconds == 0.0) {
             fprintf(stderr, "Usage: %s [nr_of_tests]\n", argv[0]);
             return EXIT_FAILURE;
         }
     }
 
     PRINT_TIMER_HEADER
-    measure_group(iterations);
-    measure_kem(iterations);
-    measure_ot(iterations);
-    measure_pet(iterations);
+    measure_group(seconds);
+    measure_kem(seconds);
+    measure_ot(seconds);
+    measure_pet(seconds);
     PRINT_TIMER_FOOTER
 
     return EXIT_SUCCESS;

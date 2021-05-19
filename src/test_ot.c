@@ -17,23 +17,30 @@
 
 static void test_ot()
 {
+    kop_result_e res;
     kop_kem_ss_s secret;
     kop_ot_recv_s recv;
     kop_ot_send_s send;
     kop_ot_recv_msg_s msg0;
     kop_ot_send_msg_s msg1;
     hid_t hid;
+    unsigned int ui, uj;
     kop_ot_index_t i, j;
 
     randombytes(hid.sid, KOP_SID_BYTES);
     hid.oenc = 0;
     hid.ot = 0;
 
-    for (i = 0; i < KOP_OT_N; i++) {
-        kop_ot_recv_init(&recv, &msg0, i, hid);
-        kop_ot_send(&send, &msg1, &msg0, hid);
-        kop_ot_recv_out(&secret, &msg1, &recv);
-        for (j = 0; j < KOP_OT_N; j++) {
+    for (ui = 0; ui < KOP_OT_N; ui++) {
+        i = (kop_ot_index_t)(ui);
+        res = kop_ot_recv_init(&recv, &msg0, i, hid);
+        assert(res == KOP_RESULT_OK);
+        res = kop_ot_send(&send, &msg1, &msg0, hid);
+        assert(res == KOP_RESULT_OK);
+        res = kop_ot_recv_out(&secret, &msg1, &recv);
+        assert(res == KOP_RESULT_OK);
+        for (uj = 0; uj < KOP_OT_N; uj++) {
+            j = (kop_ot_index_t)(uj);
             assert(verify(secret.bytes, send.secrets[j].bytes, KOP_SS_BYTES) == (i != j));
         }
     }

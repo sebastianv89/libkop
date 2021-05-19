@@ -22,8 +22,8 @@ typedef struct {
     uint8_t bytes[KOP_SS_BYTES];
 } kop_kem_ss_s;
 
-kop_result kop_kem_keygen(kop_kem_pk_s *pk, kop_kem_sk_s *sk);
-kop_result kop_kem_encaps(kop_kem_ct_s *ct, kop_kem_ss_s *ss, const kop_kem_pk_s *pk);
-kop_result kop_kem_decaps(kop_kem_ss_s *ss, const kop_kem_ct_s *ct, const kop_kem_sk_s *sk);
+kop_result_e kop_kem_keygen(kop_kem_pk_s *pk, kop_kem_sk_s *sk);
+kop_result_e kop_kem_encaps(kop_kem_ct_s *ct, kop_kem_ss_s *ss, const kop_kem_pk_s *pk);
+kop_result_e kop_kem_decaps(kop_kem_ss_s *ss, const kop_kem_ct_s *ct, const kop_kem_sk_s *sk);
 
 #endif

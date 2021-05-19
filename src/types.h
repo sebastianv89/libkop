@@ -7,6 +7,6 @@ typedef enum {
     KOP_RESULT_OK = 0,
     KOP_RESULT_ERROR = -1,
     KOP_RESULT_ABORT = -2,
-} kop_result;
+} kop_result_e;
 
 #endif

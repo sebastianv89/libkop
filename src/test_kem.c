@@ -18,7 +18,7 @@ static void test_kem()
     kop_kem_sk_s sk;
     kop_kem_ct_s ct;
     kop_kem_ss_s ss0, ss1;
-    kop_result res;
+    kop_result_e res;
 
     res = kop_kem_keygen(&pk, &sk);
     assert(res == KOP_RESULT_OK);
