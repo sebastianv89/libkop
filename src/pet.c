@@ -198,7 +198,7 @@ static void kop_oenc_send(
     hid_t hid)
 {
     kop_ot_send_s send;
-    kop_kem_ss_s secret = {0}; // prevent warnings
+    kop_kem_ss_s secret = {0};
     uint8_t digest[KOP_PRF_BYTES];
     uint8_t b;
     size_t i, j;
@@ -317,7 +317,7 @@ int kop_pet_bob_m3(
     // state->encoding == A[y] ^ B[y]
     // msg_in->encoding == A[x] ^ B[x]
     if (verify(state->encoding, msg_in->encoding, KOP_PRF_BYTES) != 0) {
-        // memset(msg_out->encoding, 0, KOP_PRF_BYTES); // prevents outputting an uninitialized value
+        memset(msg_out->encoding, 0, KOP_PRF_BYTES);
         return 0;
     }
     memcpy(msg_out->encoding, encoding_out, KOP_PRF_BYTES);

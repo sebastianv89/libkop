@@ -5,14 +5,30 @@
 #include <assert.h>
 
 #include "group.h"
+#include "common.h"
+#include "params.h"
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
 static void test_group()
 {
-    // TODO write test
-    assert(1);
+    kop_kem_pk_s a, b, c, pks[KOP_OT_N - 1];
+    const kop_kem_pk_s * pk_pointers[KOP_OT_N - 1];
+    size_t j;
+    hid_t hid = {0};
+
+    random_pk(&a);
+    random_pk(&b);
+    add_pk(&c, &a, &b);
+    sub_pk(&c, &c, &b);
+
+    for (j = 0; j < KOP_OT_N - 1; j++) {
+        random_pk(&pks[j]);
+        pk_pointers[j] = &pks[j];
+    }
+    assert(verify(a.bytes, c.bytes, KOP_PK_BYTES) == 0);
+    hash_pks(&a, pk_pointers, hid);
 }
 
 int main(int argc, char *argv[])
