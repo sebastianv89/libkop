@@ -1,3 +1,6 @@
 *.[oa]
-src/test
+src/test_group
+src/test_kem
+src/test_ot
+src/test_pet
 src/test_speed

@@ -45,20 +45,15 @@ void kop_ot_send(
     const kop_kem_pk_s * pk_pointers[KOP_OT_N];
     size_t i;
 
-    // TODO write DRY code
     for (i = 0; i < KOP_OT_N - 1; i++) {
         pk_pointers[i] = &msg_in->pks[i + 1];
     }
-    hid.kem = 0;
-    hash_pks(&digest, pk_pointers, hid);
-    add_pk(&pk, &msg_in->pks[0], &digest);
-    kop_kem_encaps(&msg_out->cts[0], &state->secrets[0], &pk);
-    for (i = 1; i < KOP_OT_N; i++) {
-        pk_pointers[i - 1] = &msg_in->pks[i - 1];
+    for (i = 0; i < KOP_OT_N; i++) {
         hid.kem = i;
         hash_pks(&digest, pk_pointers, hid);
         add_pk(&pk, &msg_in->pks[i], &digest);
         kop_kem_encaps(&msg_out->cts[i], &state->secrets[i], &pk);
+        pk_pointers[i] = &msg_in->pks[i];
     }
 }
 
@@ -67,7 +62,7 @@ void kop_ot_recv_out(
     const kop_ot_send_msg_s *msg_in,
     const kop_ot_recv_s *state_in)
 {
-    kop_kem_ct_s ct = {0}; // FIXME should not need initialization, but get warning otherwise
+    kop_kem_ct_s ct = {0};
     uint8_t b;
     size_t i;
 
