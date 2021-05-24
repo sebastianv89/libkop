@@ -206,13 +206,13 @@ static kop_result_e kop_oenc_send(
     memset(encoding, 0, KOP_PET_PRF_BYTES);
     for (i = 0; i < KOP_SIGMA; i++) {
         hid.ot = i;
-        KOP_TRY(kop_ot_send(secrets, &msgs_out[i* KOP_OT_MSG0_BYTES], &msgs_in[i], hid));
+        KOP_TRY(kop_ot_send(secrets, &msgs_out[i* KOP_OT_MSG1_BYTES], &msgs_in[i * KOP_OT_MSG0_BYTES], hid));
         // select required secret in constant time
         for (j = 1; j < KOP_OT_N; j++) {
             b = 1 - byte_neq(j, indices[i]);
             cmov(secrets[0].bytes, secrets[j].bytes, KOP_KEM_SS_BYTES, b);
         }
-        kop_pet_prf(prf_out, &secrets[0], input);
+        kop_pet_prf(prf_out, secrets, input);
         for (j = 0; j < KOP_PET_PRF_BYTES; j++) {
             encoding[j] ^= prf_out[j];
         }
@@ -246,7 +246,7 @@ void kop_pet_init(
     const uint8_t input[KOP_INPUT_BYTES],
     const uint8_t sid[KOP_SID_BYTES])
 {
-    // TODO: need to init the rest as well?
+    memset(state, 0, sizeof(kop_pet_state_s));
     memcpy(state->hid.sid, sid, KOP_SID_BYTES);
     memcpy(state->input, input, KOP_INPUT_BYTES);
 }
@@ -271,7 +271,6 @@ kop_result_e kop_pet_bob_m1(
     kop_result_e res;
     kop_ot_index_t indices[KOP_SIGMA];
     
-    // ensure no memory overlap between msg_in and msg_out
     memcpy(local_msg_in, msg_in, KOP_PET_MSG0_BYTES);
     words_from_bytes(indices, state->input);
     state->hid.oenc = 0;
