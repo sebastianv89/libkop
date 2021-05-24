@@ -3,11 +3,6 @@
 
 #include "common.h"
 
-/// Verify that two bytes are equal. Returns 0 if they are equal, 1 otherwise.
-uint8_t byte_neq(uint8_t a, uint8_t b) {
-    return (-(uint64_t)(a ^ b)) >> 63;
-}
-
 /// Verify that the bytearrays are equal. Returns 0 if
 /// they are equal, 1 otherwise.
 ///

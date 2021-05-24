@@ -2,8 +2,10 @@
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
+#include <decaf/point_448.h>
 
 #include "KeccakHash.h"
+#include "SimpleFIPS202.h"
 
 #include "group.h"
 #include "common.h"
@@ -145,7 +147,7 @@ static void polyvec_add(polyvec *r, const polyvec *a, const polyvec *b)
 
 // Serialize vector of polynomials and seed into bytes.
 static void pack_pk(
-    uint8_t r[KOP_PK_BYTES],
+    uint8_t r[KOP_PQ_PK_BYTES],
     polyvec *pk,
     const uint8_t seed[KYBER_SYMBYTES])
 {
@@ -161,7 +163,7 @@ static void pack_pk(
 static void unpack_pk(
     polyvec *pk,
     uint8_t seed[KYBER_SYMBYTES],
-    const uint8_t packedpk[KOP_PK_BYTES])
+    const uint8_t packedpk[KOP_PQ_PK_BYTES])
 {
     size_t i;
 
@@ -219,44 +221,28 @@ static void polyvec_sub(polyvec *r, const polyvec *a, const polyvec *b)
 #define SHAKE128_BYTERATE 168
 #define REJ_SAMPLE_BLOCKS ((12*KYBER_N/8*(1 << 12) / KYBER_Q + SHAKE128_BYTERATE)/SHAKE128_BYTERATE)
 #define REJ_SAMPLE_BYTES (REJ_SAMPLE_BLOCKS * SHAKE128_BYTERATE)
-static kop_result_e gen_polyvec(polyvec *a, const uint8_t seed[KYBER_SYMBYTES])
+static void gen_polyvec(polyvec *a, const uint8_t seed[KYBER_SYMBYTES])
 {
+    const uint8_t prefix[13] = { 0x4b, 0x4f, 0x50, 0x2d, 0x4b, 0x79, 0x62, 0x65, 0x72, 0x2d, 0x58, 0x4f, 0x46 }; // "KOP-Kyber-XOF";
+
     size_t ctr, i;
     uint8_t buf[REJ_SAMPLE_BYTES];
-    HashReturn hr;
-    Keccak_HashInstance khi;
+    Keccak_HashInstance hi;
 
     for (i = 0; i < KYBER_K; i++) {
-        hr = Keccak_HashInitialize_SHAKE128(&khi);
-        if (hr != KECCAK_SUCCESS) {
-            return KOP_RESULT_ERROR;
-        }
-        hr = Keccak_HashUpdate(&khi, seed, 8 * KYBER_SYMBYTES);
-        if (hr != KECCAK_SUCCESS) {
-            return KOP_RESULT_ERROR;
-        }
-        hr = Keccak_HashUpdate(&khi, (uint8_t *)(&i), 8);
-        if (hr != KECCAK_SUCCESS) {
-            return KOP_RESULT_ERROR;
-        }
-        hr = Keccak_HashFinal(&khi, NULL);
-        if (hr != KECCAK_SUCCESS) {
-            return KOP_RESULT_ERROR;
-        }
-        hr = Keccak_HashSqueeze(&khi, buf, 8 * REJ_SAMPLE_BYTES);
-        if (hr != KECCAK_SUCCESS) {
-            return KOP_RESULT_ERROR;
-        }
+        KECCAK_UNWRAP(Keccak_HashInitialize_SHAKE128(&hi));
+        KECCAK_UNWRAP(Keccak_HashUpdate(&hi, prefix, 8 * sizeof(prefix)));
+        KECCAK_UNWRAP(Keccak_HashUpdate(&hi, seed, 8 * KYBER_SYMBYTES));
+        KECCAK_UNWRAP(Keccak_HashUpdate(&hi, seed, 8 * KYBER_SYMBYTES));
+        KECCAK_UNWRAP(Keccak_HashUpdate(&hi, (uint8_t *)(&i), 8));
+        KECCAK_UNWRAP(Keccak_HashFinal(&hi, NULL));
+        KECCAK_UNWRAP(Keccak_HashSqueeze(&hi, buf, 8 * REJ_SAMPLE_BYTES));
         ctr = rej_uniform(a->vec[i].coeffs, KYBER_N, buf, REJ_SAMPLE_BYTES);
         while (ctr < KYBER_N) {
-            hr = Keccak_HashSqueeze(&khi, buf, 8 * SHAKE128_BYTERATE);
-            if (hr != KECCAK_SUCCESS) {
-                return KOP_RESULT_ERROR;
-            }
+            KECCAK_UNWRAP(Keccak_HashSqueeze(&hi, buf, 8 * SHAKE128_BYTERATE));
             ctr += rej_uniform(a->vec[i].coeffs + ctr, KYBER_N - ctr, buf, SHAKE128_BYTERATE);
         }
     }
-    return KOP_RESULT_OK;
 }
 
 void add_pk(kop_kem_pk_s *r, const kop_kem_pk_s *a, const kop_kem_pk_s *b)
@@ -265,14 +251,18 @@ void add_pk(kop_kem_pk_s *r, const kop_kem_pk_s *a, const kop_kem_pk_s *b)
     polyvec ta, tb;
     uint8_t rhoa[KYBER_SYMBYTES], rhob[KYBER_SYMBYTES];
 
-    unpack_pk(&ta, rhoa, a->bytes);
-    unpack_pk(&tb, rhob, b->bytes);
+    // PQ KEM
+    unpack_pk(&ta, rhoa, a->pq);
+    unpack_pk(&tb, rhob, b->pq);
     polyvec_add(&ta, &ta, &tb);
     polyvec_reduce(&ta);
     for (i = 0; i < KYBER_SYMBYTES; i++) {
         rhoa[i] ^= rhob[i];
     }
-    pack_pk(r->bytes, &ta, rhoa);
+    pack_pk(r->pq, &ta, rhoa);
+
+    // ECDH
+    decaf_448_point_add(r->ec.pk, a->ec.pk, b->ec.pk);
 }
 
 void sub_pk(kop_kem_pk_s *r, const kop_kem_pk_s *a, const kop_kem_pk_s *b)
@@ -281,72 +271,64 @@ void sub_pk(kop_kem_pk_s *r, const kop_kem_pk_s *a, const kop_kem_pk_s *b)
     polyvec ta, tb;
     uint8_t rhoa[KYBER_SYMBYTES], rhob[KYBER_SYMBYTES];
 
-    unpack_pk(&ta, rhoa, a->bytes);
-    unpack_pk(&tb, rhob, b->bytes);
+    // PQ KEM
+    unpack_pk(&ta, rhoa, a->pq);
+    unpack_pk(&tb, rhob, b->pq);
     polyvec_sub(&ta, &ta, &tb);
     polyvec_reduce(&ta);
     for (i = 0; i < KYBER_SYMBYTES; i++) {
         rhoa[i] ^= rhob[i];
     }
-    pack_pk(r->bytes, &ta, rhoa);
+    pack_pk(r->pq, &ta, rhoa);
+
+    // ECDH
+    decaf_448_point_sub(r->ec.pk, a->ec.pk, b->ec.pk);
 }
 
 // Expand a seed into a public key: generate polynomial
-static kop_result_e gen_pk(kop_kem_pk_s *r, const uint8_t seed[2 * KYBER_SYMBYTES])
+static void gen_pk(kop_kem_pk_s *r, const uint8_t seed[2 * (KYBER_SYMBYTES + DECAF_448_HASH_BYTES)])
 {
     polyvec a;
-    kop_result_e res;
 
-    KOP_RES(gen_polyvec(&a, seed));
-    pack_pk(r->bytes, &a, &seed[KYBER_SYMBYTES]);
-    return KOP_RESULT_OK;
+    // PQ KEM
+    gen_polyvec(&a, seed);
+    pack_pk(r->pq, &a, &seed[KYBER_SYMBYTES]);
+
+    // ECDH
+    decaf_448_point_from_hash_uniform(r->ec.pk, &seed[64]);
 }
 
-kop_result_e random_pk(kop_kem_pk_s *r)
+void random_pk(kop_kem_pk_s *r)
 {
-    uint8_t seed[2 * KYBER_SYMBYTES];
-
-    randombytes(seed, 2 * KYBER_SYMBYTES);
-    return gen_pk(r, seed);
+    uint8_t seed[64 + 2 * DECAF_448_HASH_BYTES];
+    
+    randombytes(seed, 32);
+    // hash the randomness to prevent leaking the system random state
+    FIPS202_UNWRAP(SHAKE256(seed, 2 * (KYBER_SYMBYTES + DECAF_448_HASH_BYTES), seed, 32));
+    gen_pk(r, seed);
 }
 
-kop_result_e hash_pks(kop_kem_pk_s *r, const kop_kem_pk_s * const pks[KOP_OT_N - 1], hid_t hid)
+void hash_pks(kop_kem_pk_s *r, const uint8_t * const pks[KOP_OT_N - 1], hid_t hid)
 {
-    HashReturn hr;
+    uint8_t prefix[6] = {0x4b, 0x4f, 0x50, 0x2d, 0x52, 0x4f}; // "KOP-RO"
+    uint8_t seed[64 + 2 * DECAF_448_HASH_BYTES];
     Keccak_HashInstance hi;
-    uint8_t digest[64];
     size_t i;
 
-    hr = Keccak_HashInitialize_SHA3_512(&hi);
-    if (hr != KECCAK_SUCCESS) {
-        return KOP_RESULT_ERROR;
-    }
-    hr = Keccak_HashUpdate(&hi, hid.sid, 8 * KOP_SID_BYTES);
-    if (hr != KECCAK_SUCCESS) {
-        return KOP_RESULT_ERROR;
-    }
-    hr = Keccak_HashUpdate(&hi, &hid.oenc, 8);
-    if (hr != KECCAK_SUCCESS) {
-        return KOP_RESULT_ERROR;
-    }
-    hr = Keccak_HashUpdate(&hi, &hid.ot, 8);
-    if (hr != KECCAK_SUCCESS) {
-        return KOP_RESULT_ERROR;
-    }
-    hr = Keccak_HashUpdate(&hi, &hid.kem, 8);
-    if (hr != KECCAK_SUCCESS) {
-        return KOP_RESULT_ERROR;
-    }
+    KECCAK_UNWRAP(Keccak_HashInitialize_SHAKE256(&hi));
+    // domain separation
+    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, prefix, 8 * sizeof(prefix)));
+    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, hid.sid, 8 * KOP_SID_BYTES));
+    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, &hid.oenc, 8));
+    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, &hid.ot, 8));
+    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, &hid.kem, 8));
+    // input data
     for (i = 0; i < KOP_OT_N - 1; i++) {
-        hr = Keccak_HashUpdate(&hi, pks[i]->bytes, KOP_PK_BYTES);
-        if (hr != KECCAK_SUCCESS) {
-            return KOP_RESULT_ERROR;
-        }
+        KECCAK_UNWRAP(Keccak_HashUpdate(&hi, pks[i], 8 * KOP_KEM_PK_BYTES));
     }
-    hr = Keccak_HashFinal(&hi, digest);
-    if (hr != KECCAK_SUCCESS) {
-        return KOP_RESULT_ERROR;
-    }
-    return gen_pk(r, digest);
+    // get output
+    KECCAK_UNWRAP(Keccak_HashFinal(&hi, NULL));
+    KECCAK_UNWRAP(Keccak_HashSqueeze(&hi, seed, 8 * (64 + 2 * DECAF_448_HASH_BYTES)));
+    gen_pk(r, seed);
 }
 

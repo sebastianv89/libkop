@@ -5,6 +5,8 @@
 #include <assert.h>
 
 #include "kem.h"
+#include "kem_ec.h"
+#include "kem_pq.h"
 #include "common.h"
 #include "params.h"
 #include "types.h"
@@ -12,29 +14,53 @@
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
+static void test_kem_ec()
+{
+    uint8_t ct[KOP_EC_CT_BYTES], ss0[KOP_EC_SS_BYTES], ss1[KOP_EC_SS_BYTES];
+    kop_ec_pk_s pk;
+    kop_ec_sk_s sk;
+
+    kop_ec_keygen(&pk, &sk);
+    kop_ec_encaps(ct, ss0, &pk);
+    kop_ec_decaps(ss1, ct, &sk);
+
+    assert(verify(ss0, ss1, KOP_PQ_SS_BYTES) == 0);
+}
+
+static void test_kem_pq()
+{
+    uint8_t pk[KOP_PQ_PK_BYTES],
+        sk[KOP_PQ_SK_BYTES],
+        ct[KOP_PQ_CT_BYTES],
+        ss0[KOP_PQ_SS_BYTES],
+        ss1[KOP_PQ_SS_BYTES];
+
+    kop_pq_keygen(pk, sk);
+    kop_pq_encaps(ct, ss0, pk);
+    kop_pq_decaps(ss1, ct, sk);
+
+    assert(verify(ss0, ss1, KOP_PQ_SS_BYTES) == 0);
+}
+
 static void test_kem()
 {
     kop_kem_pk_s pk;
     kop_kem_sk_s sk;
-    kop_kem_ct_s ct;
+    uint8_t ct[KOP_KEM_CT_BYTES];
     kop_kem_ss_s ss0, ss1;
-    kop_result_e res;
 
-    res = kop_kem_keygen(&pk, &sk);
-    assert(res == KOP_RESULT_OK);
-    res = kop_kem_encaps(&ct, &ss0, &pk);
-    assert(res == KOP_RESULT_OK);
-    res = kop_kem_decaps(&ss1, &ct, &sk);
-    assert(res == KOP_RESULT_OK);
+    kop_kem_keygen(&pk, &sk);
+    kop_kem_encaps(ct, &ss0, &pk);
+    kop_kem_decaps(&ss1, ct, &sk);
 
-    assert(verify(ss0.bytes, ss1.bytes, KOP_SS_BYTES) == 0);
+    assert(verify(ss0.bytes, ss1.bytes, KOP_KEM_SS_BYTES) == 0);
 }
 
 static void print_sizes()
 {
-    printf("%s\n", XSTR(KOP_KEM_ALG));
-    printf("M0, R -> S: %8u bytes (a public key)\n", KOP_PK_BYTES);
-    printf("M1, S -> R: %8u bytes (a ciphertext)\n", KOP_CT_BYTES);
+    printf("%s\n", XSTR(KOP_kem_ALG));
+    printf("M0, R -> S: %8u bytes (public key); EC + PQ == %8u + %8u\n", KOP_KEM_PK_BYTES, KOP_EC_PK_BYTES, KOP_PQ_PK_BYTES);
+    printf("M1, S -> R: %8u bytes (ciphertext); EC + PQ == %8u + %8u\n", KOP_KEM_CT_BYTES, KOP_EC_CT_BYTES, KOP_PQ_CT_BYTES);
 }
 
 int main(int argc, char *argv[])
@@ -52,6 +78,8 @@ int main(int argc, char *argv[])
     printf("OQS %s\n", OQS_VERSION_TEXT);
     print_sizes();
     for (i = 0; i < nr_of_tests; i++) {
+        test_kem_ec();
+        test_kem_pq();
         test_kem();
     }
 

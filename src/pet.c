@@ -155,108 +155,90 @@ static void words_from_bytes(
 #endif
 }
 
-
-// The PRF used in the PET.
-static kop_result_e kop_pet_prf(
-        uint8_t out[KOP_PRF_BYTES],
-        const kop_kem_ss_s *key,
-        const uint8_t input[KOP_INPUT_BYTES])
+static void kop_pet_prf(
+    uint8_t out[KOP_PET_PRF_BYTES],
+    const kop_kem_ss_s *key,
+    const uint8_t input[KOP_INPUT_BYTES])
 {
-    HashReturn hr;
-    Keccak_HashInstance hi;   
+    const uint8_t prefix[11] = { 0x4b, 0x4f, 0x50, 0x2d, 0x50, 0x45, 0x54, 0x2d, 0x50, 0x52, 0x46 }; // "KOP-PET-PRF"
+    Keccak_HashInstance hi;
 
-    hr = Keccak_HashInitialize_SHA3_256(&hi);
-    if (hr != KECCAK_SUCCESS) {
-        return KOP_RESULT_ERROR;
-    }
-    hr = Keccak_HashUpdate(&hi, key->bytes, KOP_SS_BYTES);
-    if (hr != KECCAK_SUCCESS) {
-        return KOP_RESULT_ERROR;
-    }
-    hr = Keccak_HashUpdate(&hi, input, KOP_INPUT_BYTES);
-    if (hr != KECCAK_SUCCESS) {
-        return KOP_RESULT_ERROR;
-    }
-    hr = Keccak_HashFinal(&hi, out);
-    if (hr != KECCAK_SUCCESS) {
-        return KOP_RESULT_ERROR;
-    }
-    return KOP_RESULT_OK;
+    KECCAK_UNWRAP(Keccak_HashInitialize_SHA3_256(&hi));
+    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, prefix, 8 * sizeof(prefix)));
+    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, key->bytes, 8 * KOP_KEM_SS_BYTES));
+    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, input, 8 * KOP_INPUT_BYTES));
+    KECCAK_UNWRAP(Keccak_HashFinal(&hi, out));
 }
 
 // Initialize the receiver of oblivious encoding
-static kop_result_e kop_oenc_recv_init(
+static void kop_oenc_recv_init(
     kop_ot_recv_s states[KOP_SIGMA],
-    kop_ot_recv_msg_s msgs_out[KOP_SIGMA],
+    uint8_t msgs_out[KOP_SIGMA * KOP_OT_MSG0_BYTES],
     const kop_ot_index_t indices[KOP_SIGMA],
     hid_t hid)
 {
-    kop_result_e res;
     size_t i;
 
     for (i = 0; i < KOP_SIGMA; i++) {
         hid.ot = i;
-        KOP_RES(kop_ot_recv_init(&states[i], &msgs_out[i], indices[i], hid));
+        kop_ot_recv_init(&states[i], &msgs_out[i * KOP_OT_MSG0_BYTES], indices[i], hid);
     }
-    return KOP_RESULT_OK;
 }
 
 // Run the sender of oblivious encoding.
 //
-// The sender could get arbitrary encodings, but for the PET we only require
-// the encoding of the input.
+// The sender can get arbitrary encodings, but for the PET we only require the
+// encoding of the input.
 static kop_result_e kop_oenc_send(
-    uint8_t encoding[KOP_PRF_BYTES],
-    kop_ot_send_msg_s msgs_out[KOP_SIGMA],
-    const kop_ot_recv_msg_s msgs_in[KOP_SIGMA],
+    uint8_t encoding[KOP_PET_PRF_BYTES],
+    uint8_t msgs_out[KOP_SIGMA * KOP_OT_MSG1_BYTES],
+    const uint8_t msgs_in[KOP_SIGMA * KOP_OT_MSG0_BYTES],
     const kop_ot_index_t indices[KOP_SIGMA],
     const uint8_t input[KOP_INPUT_BYTES],
     hid_t hid)
 {
     kop_result_e res;
-    kop_ot_send_s send;
-    kop_kem_ss_s secret = {0};
-    uint8_t digest[KOP_PRF_BYTES];
+    kop_kem_ss_s secrets[KOP_OT_N];
+    uint8_t prf_out[KOP_PET_PRF_BYTES];
     uint8_t b;
     size_t i, j;
 
-    memset(encoding, 0, KOP_PRF_BYTES);
+    memset(encoding, 0, KOP_PET_PRF_BYTES);
     for (i = 0; i < KOP_SIGMA; i++) {
         hid.ot = i;
-        KOP_RES(kop_ot_send(&send, &msgs_out[i], &msgs_in[i], hid));
-        for (j = 0; j < KOP_OT_N; j++) {
+        KOP_TRY(kop_ot_send(secrets, &msgs_out[i* KOP_OT_MSG0_BYTES], &msgs_in[i], hid));
+        // select required secret in constant time
+        for (j = 1; j < KOP_OT_N; j++) {
             b = 1 - byte_neq(j, indices[i]);
-            cmov(secret.bytes, send.secrets[j].bytes, KOP_SS_BYTES, b);
+            cmov(secrets[0].bytes, secrets[j].bytes, KOP_KEM_SS_BYTES, b);
         }
-        KOP_RES(kop_pet_prf(digest, &secret, input));
-        for (j = 0; j < KOP_PRF_BYTES; j++) {
-            encoding[j] ^= digest[j];
+        kop_pet_prf(prf_out, &secrets[0], input);
+        for (j = 0; j < KOP_PET_PRF_BYTES; j++) {
+            encoding[j] ^= prf_out[j];
         }
     }
     return KOP_RESULT_OK;
 }
 
 // Get receiver output of oblivious encoding.
-static kop_result_e kop_oenc_recv_out(
-    uint8_t encoding[KOP_PRF_BYTES],
-    const kop_ot_send_msg_s msgs_in[KOP_SIGMA],
+static void kop_oenc_recv_out(
+    uint8_t encoding[KOP_PET_PRF_BYTES],
+    const uint8_t msgs_in[KOP_SIGMA * KOP_OT_MSG1_BYTES],
     const kop_ot_recv_s states[KOP_SIGMA],
     const uint8_t input[KOP_INPUT_BYTES])
 {
-    kop_result_e res;
     kop_kem_ss_s secret;
-    uint8_t digest[KOP_PRF_BYTES];
+    uint8_t prf_out[KOP_PET_PRF_BYTES];
     size_t i, j;
 
-    memset(encoding, 0, KOP_PRF_BYTES);
+    memset(encoding, 0, KOP_PET_PRF_BYTES);
     for (i = 0; i < KOP_SIGMA; i++) {
-        KOP_RES(kop_ot_recv_out(&secret, &msgs_in[i], &states[i]));
-        KOP_RES(kop_pet_prf(digest, &secret, input));
-        for (j = 0; j < KOP_PRF_BYTES; j++) {
-            encoding[j] ^= digest[j];
+        kop_ot_recv_out(&secret, &msgs_in[i * KOP_OT_MSG1_BYTES], &states[i]);
+        kop_pet_prf(prf_out, &secret, input);
+        for (j = 0; j < KOP_PET_PRF_BYTES; j++) {
+            encoding[j] ^= prf_out[j];
         }
     }
-    return KOP_RESULT_OK;
 }
 
 void kop_pet_init(
@@ -264,95 +246,105 @@ void kop_pet_init(
     const uint8_t input[KOP_INPUT_BYTES],
     const uint8_t sid[KOP_SID_BYTES])
 {
+    // TODO: need to init the rest as well?
     memcpy(state->hid.sid, sid, KOP_SID_BYTES);
     memcpy(state->input, input, KOP_INPUT_BYTES);
 }
 
-kop_result_e kop_pet_alice_m0(
+void kop_pet_alice_m0(
     kop_pet_state_s *state,
-    kop_pet_msg0_s *msg_out)
+    uint8_t msg_out[KOP_PET_MSG0_BYTES])
 {
     kop_ot_index_t indices[KOP_SIGMA];
 
     words_from_bytes(indices, state->input);
     state->hid.oenc = 0;
-    return kop_oenc_recv_init(state->recv, msg_out->recv, indices, state->hid);
+    kop_oenc_recv_init(state->recv, msg_out, indices, state->hid);
 }
 
 kop_result_e kop_pet_bob_m1(
     kop_pet_state_s *state,
-    kop_pet_msg1_s *msg_out,
-    const kop_pet_msg0_s *msg_in)
+    uint8_t msg_out[KOP_PET_MSG1_BYTES],
+    const uint8_t msg_in[KOP_PET_MSG0_BYTES])
 {
+    uint8_t local_msg_in[KOP_PET_MSG0_BYTES];
     kop_result_e res;
     kop_ot_index_t indices[KOP_SIGMA];
     
+    // ensure no memory overlap between msg_in and msg_out
+    memcpy(local_msg_in, msg_in, KOP_PET_MSG0_BYTES);
     words_from_bytes(indices, state->input);
     state->hid.oenc = 0;
-    KOP_RES(kop_oenc_send(state->encoding, msg_out->send, msg_in->recv, indices, state->input, state->hid));
+    KOP_TRY(kop_oenc_send(state->encoding, msg_out, local_msg_in, indices, state->input, state->hid));
     // state->encoding == B[y]
     state->hid.oenc = 1;
-    return kop_oenc_recv_init(state->recv, msg_out->recv, indices, state->hid);
+    kop_oenc_recv_init(state->recv, &msg_out[KOP_SIGMA * KOP_OT_MSG1_BYTES], indices, state->hid);
+    return KOP_RESULT_OK;
 }
 
 kop_result_e kop_pet_alice_m2(
     kop_pet_state_s *state,
-    kop_pet_msg2_s *msg_out,
-    const kop_pet_msg1_s *msg_in)
+    uint8_t msg_out[KOP_PET_MSG2_BYTES],
+    const uint8_t msg_in[KOP_PET_MSG1_BYTES])
 {
-    kop_result_e res;
+    uint8_t local_msg_out[KOP_PET_MSG2_BYTES];
     kop_ot_index_t indices[KOP_SIGMA];
-    uint8_t encoding[KOP_PRF_BYTES];
+    kop_result_e res;
     size_t i;
 
     state->hid.oenc = 0;
-    KOP_RES(kop_oenc_recv_out(encoding, msg_in->send, state->recv, state->input));
-    // encoding == B[x]
+    kop_oenc_recv_out(local_msg_out, msg_in, state->recv, state->input);
+    // local_msg_out == B[x]
     for (i = 0; i < KOP_SIGMA; i++) {
         indices[i] = state->recv[i].index;
     }
     state->hid.oenc = 1;
-    KOP_RES(kop_oenc_send(state->encoding, msg_out->send, msg_in->recv, indices, state->input, state->hid));
+    KOP_TRY(kop_oenc_send(
+        state->encoding,
+        &local_msg_out[KOP_PET_PRF_BYTES],
+        &msg_in[KOP_SIGMA * KOP_OT_MSG1_BYTES],
+        indices,
+        state->input,
+        state->hid)
+    );
     // state->encoding == A[x]
-    for (i = 0; i < KOP_PRF_BYTES; i++) {
-        msg_out->encoding[i] = encoding[i] ^ state->encoding[i];
+    for (i = 0; i < KOP_PET_PRF_BYTES; i++) {
+        local_msg_out[i] ^= state->encoding[i];
     }
     // msg_out->encoding == A[x] ^ B[x]
+    memcpy(msg_out, local_msg_out, KOP_PET_MSG2_BYTES);
     return KOP_RESULT_OK;
 }
 
 kop_result_e kop_pet_bob_m3(
     kop_pet_state_s *state,
-    kop_pet_msg3_s *msg_out,
-    const kop_pet_msg2_s *msg_in)
+    uint8_t msg_out[KOP_PET_MSG3_BYTES],
+    const uint8_t msg_in[KOP_PET_MSG2_BYTES])
 {
-    kop_result_e res;
-    uint8_t encoding_out[KOP_PRF_BYTES];
+    uint8_t local_msg_out[KOP_PET_MSG3_BYTES];
     size_t i;
 
+    // msg_in == A[x] ^ B[x]
     // state->encoding == B[y]
     state->hid.oenc = 1;
-    KOP_RES(kop_oenc_recv_out(encoding_out, msg_in->send, state->recv, state->input));
-    // encoding_out == A[y]
-    for (i = 0; i < KOP_PRF_BYTES; i++) {
-        state->encoding[i] ^= encoding_out[i];
+    kop_oenc_recv_out(local_msg_out, &msg_in[KOP_PET_PRF_BYTES], state->recv, state->input);
+    // local_msg_out == A[y]
+    for (i = 0; i < KOP_PET_PRF_BYTES; i++) {
+        state->encoding[i] ^= local_msg_out[i];
     }
     // state->encoding == A[y] ^ B[y]
-    // msg_in->encoding == A[x] ^ B[x]
-    if (verify(state->encoding, msg_in->encoding, KOP_PRF_BYTES) != 0) {
-        memset(msg_out->encoding, 0, KOP_PRF_BYTES);
+    if (verify(state->encoding, msg_in, KOP_PET_PRF_BYTES) != 0) {
         return KOP_RESULT_ABORT;
     }
-    memcpy(msg_out->encoding, encoding_out, KOP_PRF_BYTES);
-    // msg_out->encoding == A[y]
+    memcpy(msg_out, local_msg_out, KOP_PET_MSG3_BYTES);
     return KOP_RESULT_OK;
 }
 
 kop_result_e kop_pet_alice_accept(
     kop_pet_state_s *state,
-    const kop_pet_msg3_s *msg_in)
+    const uint8_t msg_in[KOP_PET_PRF_BYTES])
 {
-    if (verify(state->encoding, msg_in->encoding, KOP_PRF_BYTES) != 0) {
+    if (verify(state->encoding, msg_in, KOP_PET_PRF_BYTES) != 0) {
         return KOP_RESULT_ABORT;
     }
     return KOP_RESULT_OK;

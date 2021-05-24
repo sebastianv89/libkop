@@ -11,6 +11,7 @@
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 static void test_with_input(
     const uint8_t x[KOP_INPUT_BYTES],
@@ -19,35 +20,56 @@ static void test_with_input(
 {
     kop_result_e res;
     kop_pet_state_s alice, bob;
-    kop_pet_msg0_s msg0;
-    kop_pet_msg1_s msg1;
-    kop_pet_msg2_s msg2;
-    kop_pet_msg3_s msg3;
+    uint8_t msg0[KOP_PET_MSG0_BYTES];
+    uint8_t msg1[KOP_PET_MSG1_BYTES];
+    uint8_t msg2[KOP_PET_MSG2_BYTES];
+    uint8_t msg3[KOP_PET_MSG3_BYTES];
     int expected = 1 - verify(x, y, KOP_INPUT_BYTES);
 
     kop_pet_init(&alice, x, sid);
     kop_pet_init(&bob, y, sid);
 
-    res = kop_pet_alice_m0(&alice, &msg0);
+    kop_pet_alice_m0(&alice, msg0);
+    res = kop_pet_bob_m1(&bob, msg1, msg0);
     assert(res == KOP_RESULT_OK);
-    res = kop_pet_bob_m1(&bob, &msg1, &msg0);
+    res = kop_pet_alice_m2(&alice, msg2, msg1);
     assert(res == KOP_RESULT_OK);
-    res = kop_pet_alice_m2(&alice, &msg2, &msg1);
-    assert(res == KOP_RESULT_OK);
-    res = kop_pet_bob_m3(&bob, &msg3, &msg2);
-    if (expected == 1) {
-        assert(res == KOP_RESULT_OK);
-    } else {
+    res = kop_pet_bob_m3(&bob, msg3, msg2);
+    if (expected != 1) {
         assert(res == KOP_RESULT_ABORT);
+        return;
     }
-    // This last message should only be sent if Bob accepted.
-    // If he does not, Alice should still reject his message.
-    res = kop_pet_alice_accept(&alice, &msg3);
-    if (expected == 1) {
-        assert(res == KOP_RESULT_OK);
-    } else {
+    assert(res == KOP_RESULT_OK);
+    res = kop_pet_alice_accept(&alice, msg3);
+    assert(res == KOP_RESULT_OK);
+}
+
+static void test_overlap(
+    const uint8_t x[KOP_INPUT_BYTES],
+    const uint8_t y[KOP_INPUT_BYTES],
+    const uint8_t sid[KOP_SID_BYTES])
+{
+    kop_result_e res;
+    kop_pet_state_s alice, bob;
+    uint8_t msg[MAX(MAX(KOP_PET_MSG0_BYTES, KOP_PET_MSG1_BYTES), MAX(KOP_PET_MSG2_BYTES, KOP_PET_MSG3_BYTES))];
+    int expected = 1 - verify(x, y, KOP_INPUT_BYTES);
+
+    kop_pet_init(&alice, x, sid);
+    kop_pet_init(&bob, y, sid);
+
+    kop_pet_alice_m0(&alice, msg);
+    res = kop_pet_bob_m1(&bob, msg, msg);
+    assert(res == KOP_RESULT_OK);
+    res = kop_pet_alice_m2(&alice, msg, msg);
+    assert(res == KOP_RESULT_OK);
+    res = kop_pet_bob_m3(&bob, msg, msg);
+    if (expected != 1) {
         assert(res == KOP_RESULT_ABORT);
+        return;
     }
+    assert(res == KOP_RESULT_OK);
+    res = kop_pet_alice_accept(&alice, msg);
+    assert(res == KOP_RESULT_OK);
 }
 
 static void test_pet()
@@ -60,6 +82,7 @@ static void test_pet()
 
     test_with_input(x, x, sid);
     test_with_input(x, y, sid);
+    test_overlap(x, x, sid);
 }
 
 static void print_sizes()
