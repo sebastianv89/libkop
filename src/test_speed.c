@@ -6,8 +6,8 @@
 #include <assert.h>
 
 #include "group.h"
-#include "kem_ec.h"
-#include "kem_pq.h"
+#include "ec.h"
+#include "pq.h"
 #include "kem.h"
 #include "ot.h"
 #include "pet.h"
@@ -19,20 +19,53 @@
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
+static void measure_group_ec(float seconds) {
+    uint8_t seed[2 * DECAF_448_HASH_BYTES];
+    kop_ec_pk_s a, b;
+
+    randombytes(seed, sizeof(seed));
+    kop_ec_gen_pk(&a, seed);
+    kop_ec_gen_pk(&b, seed);
+
+    printf("  group EC\n");
+
+    TIME_OPERATION_SECONDS(kop_ec_add_pk(&a, &a, &b), "add", seconds)
+    TIME_OPERATION_SECONDS(kop_ec_sub_pk(&a, &a, &b), "sub", seconds)
+    TIME_OPERATION_SECONDS(kop_ec_gen_pk(&a, seed), "gen", seconds)
+}
+
+static void measure_group_pq(float seconds) {
+    uint8_t seed[KOP_KYBER_SYMBYTES], rho[KOP_KYBER_SYMBYTES];
+    uint8_t a[KOP_PQ_PK_BYTES], b[KOP_PQ_PK_BYTES];
+
+    randombytes(seed, sizeof(seed));
+    randombytes(rho, sizeof(rho));
+    kop_pq_gen_pk(a, seed, rho);
+    kop_pq_gen_pk(b, seed, rho);
+
+    printf("  group PQ\n");
+
+    TIME_OPERATION_SECONDS(kop_pq_add_pk(a, a, b), "add", seconds)
+    TIME_OPERATION_SECONDS(kop_pq_sub_pk(a, a, b), "sub", seconds)
+    TIME_OPERATION_SECONDS(kop_pq_gen_pk(a, seed, rho), "gen", seconds)
+}
+
 static void measure_group(float seconds) {
     kop_kem_pk_s a, b, pk;
+    uint8_t rho[KOP_KYBER_SYMBYTES];
     uint8_t pks_serialized[(KOP_OT_N - 1) * KOP_KEM_PK_BYTES];
     const uint8_t * pk_pointers[KOP_OT_N - 1];
     size_t j;
     hid_t hid;
 
+    randombytes(rho, sizeof(rho));
     for (j = 0; j < KOP_OT_N - 1; j++) {
-        random_pk(&pk);
+        kop_random_pk(&pk, rho);
         kop_kem_pk_serialize(&pks_serialized[j * KOP_KEM_PK_BYTES], &pk);
         pk_pointers[j] = &pks_serialized[j * KOP_KEM_PK_BYTES];
     }
-    random_pk(&a);
-    random_pk(&b);
+    kop_random_pk(&a, rho);
+    kop_random_pk(&b, rho);
     randombytes(hid.sid, KOP_SID_BYTES);
     hid.oenc = 0;
     hid.ot = 0;
@@ -40,10 +73,10 @@ static void measure_group(float seconds) {
 
     printf("  group\n");
 
-    TIME_OPERATION_SECONDS(add_pk(&a, &a, &b), "add", seconds)
-    TIME_OPERATION_SECONDS(sub_pk(&a, &a, &b), "sub", seconds)
-    TIME_OPERATION_SECONDS(random_pk(&a), "random", seconds)
-    TIME_OPERATION_SECONDS(hash_pks(&a, pk_pointers, hid), "hash", seconds)
+    TIME_OPERATION_SECONDS(kop_add_pk(&a, &a, &b), "add", seconds)
+    TIME_OPERATION_SECONDS(kop_sub_pk(&a, &a, &b), "sub", seconds)
+    TIME_OPERATION_SECONDS(kop_random_pk(&a, rho), "random", seconds)
+    TIME_OPERATION_SECONDS(kop_hash_pks(&a, pk_pointers, rho, hid), "hash", seconds)
 }
 
 static void measure_kem_ec(float seconds)
@@ -146,6 +179,8 @@ int main(int argc, char *argv[])
     }
 
     PRINT_TIMER_HEADER
+    measure_group_ec(seconds);
+    measure_group_pq(seconds);
     measure_group(seconds);
     measure_kem_ec(seconds);
     measure_kem_pq(seconds);

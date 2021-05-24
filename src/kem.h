@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#include "kem_ec.h"
-#include "kem_pq.h"
+#include "ec.h"
+#include "pq.h"
 #include "types.h"
 #include "params.h"
 

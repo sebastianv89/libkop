@@ -8,34 +8,68 @@
 
 #include "group.h"
 #include "kem.h"
+#include "ec.h"
+#include "pq.h"
 #include "params.h"
 #include "common.h"
+#include "randombytes.h"
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
+static void test_ec()
+{
+    uint8_t seed[2 * DECAF_448_HASH_BYTES];
+    kop_ec_pk_s a, b, c;
+
+    randombytes(seed, sizeof(seed));
+    kop_ec_gen_pk(&a, seed);
+    randombytes(seed, sizeof(seed));
+    kop_ec_gen_pk(&b, seed);
+    kop_ec_add_pk(&c, &a, &b);
+    kop_ec_sub_pk(&c, &c, &b);
+    assert(decaf_448_point_eq(a.pk, c.pk) == DECAF_TRUE);
+}
+
+static void test_pq()
+{
+    uint8_t seed[KOP_KYBER_SYMBYTES], rho[KOP_KYBER_SYMBYTES];
+    uint8_t a[KOP_PQ_PK_BYTES], b[KOP_PQ_PK_BYTES], c[KOP_PQ_PK_BYTES];
+
+    randombytes(rho, sizeof(rho));
+    randombytes(seed, sizeof(seed));
+    kop_pq_gen_pk(a, seed, rho);
+    randombytes(seed, sizeof(seed));
+    kop_pq_gen_pk(b, seed, rho);
+    kop_pq_add_pk(c, a, b);
+    kop_pq_sub_pk(c, c, b);
+    assert(verify(c, a, KOP_PQ_PK_BYTES) == 0);
+}
+
 static void test_group()
 {
     kop_kem_pk_s a, b, c, pk;
+    uint8_t rho[KOP_KYBER_SYMBYTES];
     uint8_t pk_serialized[(KOP_OT_N - 1) * KOP_KEM_PK_BYTES];
     const uint8_t * pk_pointers[KOP_OT_N - 1];
     size_t j;
     hid_t hid = {0};
 
-    random_pk(&a);
-    random_pk(&b);
-    add_pk(&c, &a, &b);
-    sub_pk(&c, &c, &b);
+    randombytes(rho, sizeof(rho));
+    kop_random_pk(&a, rho);
+    kop_random_pk(&b, rho);
+    kop_add_pk(&c, &a, &b);
+    kop_sub_pk(&c, &c, &b);
     assert(decaf_448_point_eq(a.ec.pk, c.ec.pk) == DECAF_TRUE);
     assert(verify(a.pq, c.pq, KOP_PQ_PK_BYTES) == 0);
 
     for (j = 0; j < KOP_OT_N - 1; j++) {
-        random_pk(&pk);
+        kop_random_pk(&pk, rho);
         kop_kem_pk_serialize(&pk_serialized[j * KOP_KEM_PK_BYTES], &pk);
         pk_pointers[j] = &pk_serialized[j * KOP_KEM_PK_BYTES];
     }
-    hash_pks(&a, pk_pointers, hid);
-    hash_pks(&b, pk_pointers, hid);
+    kop_hash_pks(&a, pk_pointers, rho, hid);
+    kop_hash_pks(&b, pk_pointers, rho, hid);
     assert(decaf_448_point_eq(a.ec.pk, b.ec.pk) == DECAF_TRUE);
     assert(verify(a.pq, b.pq, KOP_PQ_PK_BYTES) == 0);
 }
@@ -53,6 +87,8 @@ int main(int argc, char *argv[])
     }
 
     for (i = 0; i < nr_of_tests; i++) {
+        test_ec();
+        test_pq();
         test_group();
     }
 

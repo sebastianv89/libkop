@@ -45,7 +45,7 @@ static void test_ot()
 
 static void print_sizes()
 {
-    printf("%s, N=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_N);
+    printf("%s, N=%u\n", XSTR(KOP_PQ_ALG), KOP_OT_N);
     printf("M0, R -> S: %8u bytes (N public keys)\n", KOP_OT_MSG0_BYTES);
     printf("M1, S -> R: %8u bytes (N ciphertexts)\n", KOP_OT_MSG1_BYTES);
 }

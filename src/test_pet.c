@@ -87,7 +87,7 @@ static void test_pet()
 
 static void print_sizes()
 {
-    printf("%s, N=%u, σ=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_N, KOP_SIGMA);
+    printf("%s, N=%u, σ=%u\n", XSTR(KOP_PQ_ALG), KOP_OT_N, KOP_SIGMA);
     printf("M0, A -> B: %8u bytes (σN public keys)\n", KOP_PET_MSG0_BYTES);
     printf("M1, B -> A: %8u bytes (σN (ciphertexts + public keys))\n", KOP_PET_MSG1_BYTES);
     printf("M2, A -> B: %8u bytes (encoding + σN ciphertexts))\n", KOP_PET_MSG2_BYTES);

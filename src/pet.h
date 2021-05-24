@@ -1,5 +1,5 @@
-#ifndef PET_H
-#define PET_H
+#ifndef KOP_PET_H
+#define KOP_PET_H
 
 #include <stddef.h>
 #include <stdint.h>

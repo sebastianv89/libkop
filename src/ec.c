@@ -1,11 +1,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <decaf/decaf.h>
+#include <decaf/common.h>
+#include <decaf/point_448.h>
 
 #include "KeccakHash.h"
 
-#include "kem_ec.h"
+#include "ec.h"
 #include "common.h"
 #include "types.h"
 #include "randombytes.h"
@@ -37,6 +38,29 @@ static void kop_ec_kdf(
     // output
     KECCAK_UNWRAP(Keccak_HashFinal(&hi, NULL));
     KECCAK_UNWRAP(Keccak_HashSqueeze(&hi, ss, 8 * KOP_EC_SS_BYTES));
+}
+
+void kop_ec_add_pk(
+    kop_ec_pk_s *r,
+    const kop_ec_pk_s *a,
+    const kop_ec_pk_s *b)
+{
+    decaf_448_point_add(r->pk, a->pk, b->pk);
+}
+
+void kop_ec_sub_pk(
+    kop_ec_pk_s *r,
+    const kop_ec_pk_s *a,
+    const kop_ec_pk_s *b)
+{
+    decaf_448_point_sub(r->pk, a->pk, b->pk);
+}
+
+void kop_ec_gen_pk(
+    kop_ec_pk_s *r,
+    const uint8_t seed[2 * DECAF_448_HASH_BYTES])
+{
+    decaf_448_point_from_hash_uniform(r->pk, seed);
 }
 
 void kop_ec_keygen(

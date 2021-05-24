@@ -1,10 +1,9 @@
-#ifndef GROUP_H
-#define GROUP_H
+#ifndef KOP_GROUP_H
+#define KOP_GROUP_H
 
 #include <stdint.h>
 #include "params.h"
 #include "kem.h"
-#include "types.h"
 
 /// Hash ID, used for domain separation (random oracle cloning)
 typedef struct {
@@ -14,22 +13,24 @@ typedef struct {
     uint8_t kem;                // kem index (0 to N)
 } hid_t;
 
-void add_pk(
+void kop_add_pk(
     kop_kem_pk_s *r,
     const kop_kem_pk_s *a,
     const kop_kem_pk_s *b);
 
-void sub_pk(
+void kop_sub_pk(
     kop_kem_pk_s *r,
     const kop_kem_pk_s *a,
     const kop_kem_pk_s *b);
 
-void random_pk(
-    kop_kem_pk_s *r);
+void kop_random_pk(
+    kop_kem_pk_s *r,
+    const uint8_t rho[KOP_KYBER_SYMBYTES]);
 
-void hash_pks(
+void kop_hash_pks(
     kop_kem_pk_s *r,
     const uint8_t * const pks_serialized[KOP_OT_N - 1],
+    const uint8_t rho[KOP_KYBER_SYMBYTES],
     hid_t hid);
 
 #endif

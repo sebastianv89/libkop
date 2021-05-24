@@ -5,8 +5,8 @@
 #include <assert.h>
 
 #include "kem.h"
-#include "kem_ec.h"
-#include "kem_pq.h"
+#include "ec.h"
+#include "pq.h"
 #include "common.h"
 #include "params.h"
 #include "types.h"
@@ -58,7 +58,7 @@ static void test_kem()
 
 static void print_sizes()
 {
-    printf("%s\n", XSTR(KOP_kem_ALG));
+    printf("%s\n", XSTR(KOP_PQ_ALG));
     printf("M0, R -> S: %8u bytes (public key); EC + PQ == %8u + %8u\n", KOP_KEM_PK_BYTES, KOP_EC_PK_BYTES, KOP_PQ_PK_BYTES);
     printf("M1, S -> R: %8u bytes (ciphertext); EC + PQ == %8u + %8u\n", KOP_KEM_CT_BYTES, KOP_EC_CT_BYTES, KOP_PQ_CT_BYTES);
 }

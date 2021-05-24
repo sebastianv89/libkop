@@ -4,8 +4,8 @@
 #include "KeccakHash.h"
 
 #include "kem.h"
-#include "kem_ec.h"
-#include "kem_pq.h"
+#include "ec.h"
+#include "pq.h"
 #include "common.h"
 #include "types.h"
 #include "randombytes.h"

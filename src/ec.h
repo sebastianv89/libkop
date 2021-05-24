@@ -1,11 +1,11 @@
-#ifndef KOP_KEM_EC_H
-#define KOP_KEM_EC_H
+#ifndef KOP_EC_H
+#define KOP_EC_H
 
 #include <stdint.h>
 #include <decaf/point_448.h>
 
-#include "types.h"
 #include "params.h"
+#include "types.h"
 
 typedef struct {
     decaf_448_scalar_t sk;
@@ -15,6 +15,20 @@ typedef struct {
 typedef struct {
     decaf_448_point_t pk;
 } kop_ec_pk_s;
+
+void kop_ec_add_pk(
+    kop_ec_pk_s *r,
+    const kop_ec_pk_s *a,
+    const kop_ec_pk_s *b);
+
+void kop_ec_sub_pk(
+    kop_ec_pk_s *r,
+    const kop_ec_pk_s *a,
+    const kop_ec_pk_s *b);
+
+void kop_ec_gen_pk(
+    kop_ec_pk_s *r,
+    const uint8_t seed[2 * DECAF_448_HASH_BYTES]);
 
 void kop_ec_keygen(
     kop_ec_pk_s *pk,

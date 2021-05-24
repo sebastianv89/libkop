@@ -28,14 +28,8 @@
         exit(EXIT_FAILURE);\
     }\
     })
-#define FIPS202_UNWRAP(call) ({\
-    if (call != 0) {\
-        exit(EXIT_FAILURE);\
-    }\
-    })
 #else
 #define KECCAK_UNWRAP(call) ({ call; })
-#define FIPS202_UNWRAP(call) ({ call; })
 #endif
 
 // OQS calls can only fail if provided with invalid input, or if misconfigured

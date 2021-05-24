@@ -1,5 +1,5 @@
-#ifndef OT_H
-#define OT_H
+#ifndef KOP_OT_H
+#define KOP_OT_H
 
 #include <stddef.h>
 #include <stdint.h>
