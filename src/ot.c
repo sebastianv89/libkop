@@ -55,7 +55,7 @@ kop_result_e kop_ot_send(
     }
     for (i = 0; i < KOP_OT_N; i++) {
         KOP_TRY(kop_kem_pk_deserialize(&pk, &msg_in[i * KOP_KEM_PK_BYTES]));
-        rho = kop_pq_pk_rho(pk.pq); // TODO does anything break if rho changes?
+        rho = kop_pq_pk_rho(pk.pq);
         hid.kem = i;
         kop_hash_pks(&digest, pk_pointers, rho, hid);
         kop_add_pk(&pk, &pk, &digest);

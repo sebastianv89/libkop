@@ -19,6 +19,18 @@
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
+static void measure_ec_validation(float seconds) {
+    uint8_t buf[DECAF_448_SER_BYTES];
+    decaf_448_point_t p;
+    decaf_error_t err;
+
+    printf("  Decaf decoding (validating)\n");
+    randombytes(buf, sizeof(buf));
+
+    TIME_OPERATION_SECONDS(err = decaf_448_point_decode(p, buf, DECAF_FALSE), "decode", seconds)
+    (void)err; // hide "err unused" warning
+}
+
 static void measure_group_ec(float seconds) {
     uint8_t seed[2 * DECAF_448_HASH_BYTES];
     kop_ec_pk_s a, b;
@@ -85,7 +97,7 @@ static void measure_kem_ec(float seconds)
     kop_ec_sk_s sk;
     uint8_t ct[KOP_EC_CT_BYTES], ss[KOP_EC_SS_BYTES];
 
-    printf("  KEM EC: ElGamal Decaf448\n");
+    printf("  KEM EC: ECIES Decaf448\n");
 
     TIME_OPERATION_SECONDS(kop_ec_keygen(&pk, &sk), "keygen", seconds)
     TIME_OPERATION_SECONDS(kop_ec_encaps(ct, ss, &pk), "encaps", seconds)
@@ -179,6 +191,7 @@ int main(int argc, char *argv[])
     }
 
     PRINT_TIMER_HEADER
+    measure_ec_validation(seconds);
     measure_group_ec(seconds);
     measure_group_pq(seconds);
     measure_group(seconds);

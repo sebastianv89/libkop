@@ -23,8 +23,8 @@ static kop_result_e kop_result_from_decaf_error(decaf_error_t err)
 
 static void kop_ec_kdf(
     uint8_t ss[KOP_EC_SS_BYTES],
-    const uint8_t m_serialized[DECAF_448_SER_BYTES],
-    const uint8_t ct[KOP_EC_CT_BYTES])
+    const uint8_t ct[KOP_EC_CT_BYTES],
+    const uint8_t h[DECAF_448_SER_BYTES])
 {
     const uint8_t prefix[10] = {0x4b, 0x4f, 0x50, 0x2d, 0x45, 0x43, 0x2d, 0x4b, 0x44, 0x46}; // "KOP-EC-KDF"
     Keccak_HashInstance hi;
@@ -32,9 +32,9 @@ static void kop_ec_kdf(
     KECCAK_UNWRAP(Keccak_HashInitialize_SHAKE256(&hi));
     // domain separation
     KECCAK_UNWRAP(Keccak_HashUpdate(&hi, prefix, 8 * sizeof(prefix)));
-    // hash message and ciphertext
-    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, m_serialized, 8 * DECAF_448_SER_BYTES));
+    // hash ciphertext and shared secret
     KECCAK_UNWRAP(Keccak_HashUpdate(&hi, ct, 8 * KOP_EC_CT_BYTES));
+    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, h, 8 * DECAF_448_SER_BYTES));
     // output
     KECCAK_UNWRAP(Keccak_HashFinal(&hi, NULL));
     KECCAK_UNWRAP(Keccak_HashSqueeze(&hi, ss, 8 * KOP_EC_SS_BYTES));
@@ -84,20 +84,17 @@ void kop_ec_encaps(
     uint8_t ss[KOP_EC_SS_BYTES],
     const kop_ec_pk_s *pk)
 {
-    uint8_t buf[MAX(DECAF_448_SCALAR_BYTES + 2 * DECAF_448_HASH_BYTES, DECAF_448_SER_BYTES)];
+    uint8_t buf[MAX(DECAF_448_SCALAR_BYTES, DECAF_448_SER_BYTES)];
     decaf_448_scalar_t scalar;
-    decaf_448_point_t m, c0, c1;
+    decaf_448_point_t g, h;
 
-    randombytes(buf, DECAF_448_SCALAR_BYTES + 2 * DECAF_448_HASH_BYTES);
+    randombytes(buf, DECAF_448_SCALAR_BYTES);
     decaf_448_scalar_decode_long(scalar, buf, DECAF_448_SCALAR_BYTES);
-    decaf_448_point_from_hash_uniform(m, &buf[DECAF_448_SCALAR_BYTES]);
-    decaf_448_precomputed_scalarmul(c0, decaf_448_precomputed_base, scalar);
-    decaf_448_point_scalarmul(c1, pk->pk, scalar);
-    decaf_448_point_add(c1, c1, m);
-    decaf_448_point_encode(ct, c0);
-    decaf_448_point_encode(buf, m);
-    decaf_448_point_encode(&ct[DECAF_448_SER_BYTES], c1);
-    kop_ec_kdf(ss, buf, ct);
+    decaf_448_precomputed_scalarmul(g, decaf_448_precomputed_base, scalar);
+    decaf_448_point_scalarmul(h, pk->pk, scalar);
+    decaf_448_point_encode(ct, g);
+    decaf_448_point_encode(buf, h);
+    kop_ec_kdf(ss, ct, buf);
 }
 
 void kop_ec_decaps(
@@ -106,24 +103,21 @@ void kop_ec_decaps(
     const kop_ec_sk_s *sk)
 {
     decaf_error_t err;
-    decaf_448_point_t c0, c1;
-    uint8_t m_serialized[DECAF_448_SER_BYTES];
+    decaf_448_point_t g;
+    uint8_t buf[DECAF_448_SER_BYTES];
     
     // we cannot stop after the first error to output kdf(sk->s, ct), but we
-    // continue the calculation with dummy values in order not to leak any
+    // continue the calculation with default values in order not to leak any
     // timing info
 
-    err = decaf_448_point_decode(c0, ct, DECAF_FALSE);
-    // c0 = (err == DECAF_SUCCESS ? c0 : base)
-    decaf_448_point_cond_sel(c0, decaf_448_point_base, c0, err);
-    err &= decaf_448_point_decode(c1, &ct[DECAF_448_SER_BYTES], DECAF_TRUE);
-    // c1 = (err == DECAF_SUCCESS ? c1 : base)
-    decaf_448_point_cond_sel(c1, decaf_448_point_base, c1, err);
-    decaf_448_point_scalarmul(c0, c0, sk->sk);
-    decaf_448_point_sub(c1, c1, c0);
-    decaf_448_point_encode(m_serialized, c1);
-    cmov(m_serialized, sk->s, DECAF_448_SER_BYTES, 1+err);
-    kop_ec_kdf(ss, m_serialized, ct);
+    err = decaf_448_point_decode(g, ct, DECAF_FALSE);
+    // c0 = (err == DECAF_SUCCESS ? g : base)
+    decaf_448_point_cond_sel(g, decaf_448_point_base, g, err);
+    decaf_448_point_scalarmul(g, g, sk->sk);
+    decaf_448_point_encode(buf, g);
+    // if (err == DECAF_SUCCESS) { m = sk->s; }
+    cmov(buf, sk->s, DECAF_448_SER_BYTES, 1+err);
+    kop_ec_kdf(ss, ct, buf);
 }
 
 void kop_ec_pk_serialize(
