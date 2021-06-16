@@ -18,24 +18,8 @@
 /// [0]: github.com/pq-crystals/kyber/tree/master/ref
 ///////
 
-#ifndef KYBER_K
-#define KYBER_K 3
-#endif
-
-#define KYBER_N 256
-#define KYBER_Q 3329
-
-#define KYBER_SYMBYTES      32
 #define KYBER_POLYBYTES		384
 #define KYBER_POLYVECBYTES	(KYBER_K * KYBER_POLYBYTES)
-
-typedef struct {
-    int16_t coeffs[KYBER_N];
-} poly;
-
-typedef struct {
-    poly vec[KYBER_K];
-} polyvec;
 
 // Serialization of a polynomial
 static void poly_tobytes(uint8_t r[KYBER_POLYBYTES], const poly *a)
@@ -81,8 +65,9 @@ static void poly_reduce(poly *r)
 {
     size_t i;
 
-    for (i = 0; i < KYBER_N; i++)
+    for (i = 0; i < KYBER_N; i++) {
         r->coeffs[i] = barrett_reduce(r->coeffs[i]);
+    }
 }
 
 // Add polynomials
@@ -106,7 +91,7 @@ static void poly_sub(poly *r, const poly *a, const poly *b)
 }
 
 // Serialize a vector of polynomials
-static void polyvec_tobytes(uint8_t r[KYBER_POLYVECBYTES], polyvec *a)
+static void polyvec_tobytes(uint8_t r[KYBER_POLYVECBYTES], const polyvec *a)
 {
     size_t i;
 
@@ -145,33 +130,6 @@ static void polyvec_add(polyvec *r, const polyvec *a, const polyvec *b)
     }
 }
 
-// Serialize vector of polynomials and seed into bytes.
-static void pack_pk(
-    uint8_t r[KOP_PQ_PK_BYTES],
-    polyvec *pk,
-    const uint8_t seed[KYBER_SYMBYTES])
-{
-    size_t i;
-
-    polyvec_tobytes(r, pk);
-    for (i = 0; i < KYBER_SYMBYTES; i++) {
-        r[i + KYBER_POLYVECBYTES] = seed[i];
-    }
-}
-
-// De-serialize vector of polynomials and seed from bytes.
-static void unpack_pk(
-    polyvec *pk,
-    uint8_t seed[KYBER_SYMBYTES],
-    const uint8_t packedpk[KOP_PQ_PK_BYTES])
-{
-    size_t i;
-
-    polyvec_frombytes(pk, packedpk);
-    for (i = 0; i < KYBER_SYMBYTES; i++) {
-        seed[i] = packedpk[i + KYBER_POLYVECBYTES];
-    }
-}
 
 // rejection sampling (three bytes to two coordinates mod q)
 static size_t rej_uniform(
@@ -246,71 +204,65 @@ static void gen_polyvec(polyvec *a, const uint8_t seed[KYBER_SYMBYTES])
 }
 
 void kop_pq_add_pk(
-    uint8_t r[KOP_PQ_PK_BYTES],
-    const uint8_t a[KOP_PQ_PK_BYTES],
-    const uint8_t b[KOP_PQ_PK_BYTES])
+    kop_pq_pk_s *r,
+    const kop_pq_pk_s *a,
+    const kop_pq_pk_s *b)
 {
-    uint8_t rho[KYBER_SYMBYTES];
-    polyvec ta, tb;
-
 #ifdef KOP_DEBUG
     // required: a and b have the same rho for expanding matrix A
-    assert(verify(&a[KYBER_POLYVECBYTES], &b[KYBER_POLYVECBYTES], KYBER_SYMBYTES) == 0);
+    assert(verify(a->rho, b->rho, KYBER_SYMBYTES) == 0);
 #endif
 
     // PQ KEM
-    unpack_pk(&ta, rho, a);
-    unpack_pk(&tb, rho, b);
-    polyvec_add(&ta, &ta, &tb);
-    polyvec_reduce(&ta);
-    pack_pk(r, &ta, rho);
+    polyvec_add(&r->t, &a->t, &b->t);
+    polyvec_reduce(&r->t);
+    memmove(r->rho, a->rho, KYBER_SYMBYTES);
 }
 
 void kop_pq_sub_pk(
-    uint8_t r[KOP_PQ_PK_BYTES],
-    const uint8_t a[KOP_PQ_PK_BYTES],
-    const uint8_t b[KOP_PQ_PK_BYTES])
+    kop_pq_pk_s *r,
+    const kop_pq_pk_s *a,
+    const kop_pq_pk_s *b)
 {
-    uint8_t rho[KYBER_SYMBYTES];
-    polyvec ta, tb;
-
 #ifdef KOP_DEBUG
     // required: a and b have the same rho for expanding matrix A
-    assert(verify(&a[KYBER_POLYVECBYTES], &b[KYBER_POLYVECBYTES], KYBER_SYMBYTES) == 0);
+    assert(verify(a->rho, b->rho, KYBER_SYMBYTES) == 0);
 #endif
 
     // PQ KEM
-    unpack_pk(&ta, rho, a);
-    unpack_pk(&tb, rho, b);
-    polyvec_sub(&ta, &ta, &tb);
-    polyvec_reduce(&ta);
-    pack_pk(r, &ta, rho);
+    polyvec_sub(&r->t, &a->t, &b->t);
+    polyvec_reduce(&r->t);
+    memmove(r->rho, a->rho, KYBER_SYMBYTES);
 }
 
 void kop_pq_gen_pk(
-    uint8_t r[KOP_PQ_PK_BYTES],
+    kop_pq_pk_s *r,
     const uint8_t seed[KYBER_SYMBYTES],
     const uint8_t rho[KYBER_SYMBYTES])
 {
-    polyvec a;
-
-    gen_polyvec(&a, seed);
-    pack_pk(r, &a, rho);
+    gen_polyvec(&r->t, seed);
+    memmove(r->rho, rho, KYBER_SYMBYTES);
 }
 
 void kop_pq_keygen(
-    uint8_t pk[KOP_PQ_PK_BYTES],
+    kop_pq_pk_s *pk,
     uint8_t sk[KOP_PQ_SK_BYTES])
 {
-    OQS_UNWRAP(KOP_PQ_KEYGEN(pk, sk));
+    uint8_t pk_ser[KOP_PQ_PK_BYTES];
+
+    OQS_UNWRAP(KOP_PQ_KEYGEN(pk_ser, sk));
+    kop_pq_pk_deserialize(pk, pk_ser);
 }
 
 void kop_pq_encaps(
     uint8_t ct[KOP_PQ_CT_BYTES],
     uint8_t ss[KOP_PQ_SS_BYTES],
-    const uint8_t pk[KOP_PQ_PK_BYTES])
+    const kop_pq_pk_s *pk)
 {
-    OQS_UNWRAP(KOP_PQ_ENCAPS(ct, ss, pk));
+    uint8_t pk_ser[KOP_PQ_PK_BYTES];
+
+    kop_pq_pk_serialize(pk_ser, pk);
+    OQS_UNWRAP(KOP_PQ_ENCAPS(ct, ss, pk_ser));
 }
 
 void kop_pq_decaps(
@@ -321,8 +273,20 @@ void kop_pq_decaps(
     OQS_UNWRAP(KOP_PQ_DECAPS(ss, ct, sk));
 }
 
-const uint8_t * kop_pq_pk_rho(
-    const uint8_t pk[KOP_PQ_PK_BYTES])
+void kop_pq_pk_serialize(
+    uint8_t out[KOP_PQ_PK_BYTES],
+    const kop_pq_pk_s *pk)
 {
-    return &pk[KYBER_POLYVECBYTES];
+    polyvec_tobytes(out, &pk->t);
+    memcpy(&out[KYBER_POLYVECBYTES], pk->rho, KYBER_SYMBYTES);
 }
+
+void kop_pq_pk_deserialize(
+    kop_pq_pk_s *pk,
+    const uint8_t in[KOP_PQ_PK_BYTES])
+{
+    polyvec_frombytes(&pk->t, in);
+    memcpy(pk->rho, &in[KYBER_POLYVECBYTES], KYBER_SYMBYTES);
+
+}
+

@@ -36,7 +36,7 @@ static void kop_kdf(
 void kop_kem_keygen(kop_kem_pk_s *pk, kop_kem_sk_s *sk)
 {
     kop_ec_keygen(&pk->ec, &sk->ec);
-    kop_pq_keygen(pk->pq, sk->pq);
+    kop_pq_keygen(&pk->pq, sk->pq);
 }
 
 void kop_kem_encaps(
@@ -47,7 +47,7 @@ void kop_kem_encaps(
     uint8_t ec_ss[KOP_EC_SS_BYTES], pq_ss[KOP_PQ_SS_BYTES];
     
     kop_ec_encaps(ct, ec_ss, &pk->ec);
-    kop_pq_encaps(&ct[KOP_EC_CT_BYTES], pq_ss, pk->pq);
+    kop_pq_encaps(&ct[KOP_EC_CT_BYTES], pq_ss, &pk->pq);
     kop_kdf(ss, pq_ss, ec_ss, ct);
 }
 
@@ -68,7 +68,7 @@ void kop_kem_pk_serialize(
     const kop_kem_pk_s *pk) 
 {
     kop_ec_pk_serialize(out, &pk->ec);
-    memcpy(&out[KOP_EC_PK_BYTES], pk->pq, KOP_PQ_PK_BYTES);
+    kop_pq_pk_serialize(&out[KOP_EC_PK_BYTES], &pk->pq);
 }
 
 kop_result_e kop_kem_pk_deserialize(kop_kem_pk_s *pk, const uint8_t in[KOP_KEM_PK_BYTES])
@@ -76,7 +76,7 @@ kop_result_e kop_kem_pk_deserialize(kop_kem_pk_s *pk, const uint8_t in[KOP_KEM_P
     kop_result_e res;
 
     res = kop_ec_pk_deserialize(&pk->ec, in);
-    memcpy(pk->pq, &in[KOP_EC_PK_BYTES], KOP_PQ_PK_BYTES);
+    kop_pq_pk_deserialize(&pk->pq, &in[KOP_EC_PK_BYTES]);
     return res;
 }
 

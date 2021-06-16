@@ -29,14 +29,14 @@ static void test_kem_ec()
 
 static void test_kem_pq()
 {
-    uint8_t pk[KOP_PQ_PK_BYTES],
-        sk[KOP_PQ_SK_BYTES],
+    uint8_t sk[KOP_PQ_SK_BYTES],
         ct[KOP_PQ_CT_BYTES],
         ss0[KOP_PQ_SS_BYTES],
         ss1[KOP_PQ_SS_BYTES];
+    kop_pq_pk_s pk;
 
-    kop_pq_keygen(pk, sk);
-    kop_pq_encaps(ct, ss0, pk);
+    kop_pq_keygen(&pk, sk);
+    kop_pq_encaps(ct, ss0, &pk);
     kop_pq_decaps(ss1, ct, sk);
 
     assert(verify(ss0, ss1, KOP_PQ_SS_BYTES) == 0);

@@ -15,19 +15,17 @@ void kop_ot_recv_init(
 {
     kop_kem_pk_s pk, r;
     const uint8_t * pk_pointers[KOP_OT_N - 1];
-    const uint8_t * rho;
     size_t i;
     uint8_t swapbit = 1;
 
     kop_kem_keygen(&pk, &state->sk);
-    rho = kop_pq_pk_rho(pk.pq);
     for (i = 1; i < KOP_OT_N; i++) {
-        kop_random_pk(&r, rho);
+        kop_random_pk(&r, pk.pq.rho);
         kop_kem_pk_serialize(&msg_out[i * KOP_KEM_PK_BYTES], &r);
         pk_pointers[i - 1] = &msg_out[i * KOP_KEM_PK_BYTES];
     }
     hid.kem = index;
-    kop_hash_pks(&r, pk_pointers, rho, hid);
+    kop_hash_pks(&r, pk_pointers, pk.pq.rho, hid);
     kop_sub_pk(&pk, &pk, &r);
     kop_kem_pk_serialize(msg_out, &pk);
     // put the public key in `index`-th place
@@ -47,7 +45,6 @@ kop_result_e kop_ot_send(
     kop_result_e res;
     kop_kem_pk_s pk, digest;
     const uint8_t * pk_pointers[KOP_OT_N];
-    const uint8_t * rho;
     size_t i;
 
     for (i = 0; i < KOP_OT_N - 1; i++) {
@@ -55,9 +52,8 @@ kop_result_e kop_ot_send(
     }
     for (i = 0; i < KOP_OT_N; i++) {
         KOP_TRY(kop_kem_pk_deserialize(&pk, &msg_in[i * KOP_KEM_PK_BYTES]));
-        rho = kop_pq_pk_rho(pk.pq);
         hid.kem = i;
-        kop_hash_pks(&digest, pk_pointers, rho, hid);
+        kop_hash_pks(&digest, pk_pointers, pk.pq.rho, hid);
         kop_add_pk(&pk, &pk, &digest);
         kop_kem_encaps(&msg_out[i * KOP_KEM_CT_BYTES], &secrets[i], &pk);
         pk_pointers[i] = &msg_in[i * KOP_KEM_PK_BYTES];

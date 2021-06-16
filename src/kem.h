@@ -15,7 +15,7 @@ typedef struct {
 
 typedef struct {
     kop_ec_pk_s ec;
-    uint8_t pq[KOP_PQ_PK_BYTES];
+    kop_pq_pk_s pq;
 } kop_kem_pk_s;
 
 typedef struct {

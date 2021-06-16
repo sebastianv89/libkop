@@ -17,7 +17,7 @@ void kop_add_pk(
     const kop_kem_pk_s *b)
 {
     kop_ec_add_pk(&r->ec, &a->ec, &b->ec);
-    kop_pq_add_pk(r->pq, a->pq, b->pq);
+    kop_pq_add_pk(&r->pq, &a->pq, &b->pq);
 }
 
 void kop_sub_pk(
@@ -26,7 +26,7 @@ void kop_sub_pk(
     const kop_kem_pk_s *b)
 {
     kop_ec_sub_pk(&r->ec, &a->ec, &b->ec);
-    kop_pq_sub_pk(r->pq, a->pq, b->pq);
+    kop_pq_sub_pk(&r->pq, &a->pq, &b->pq);
 }
 
 void kop_random_pk(
@@ -37,7 +37,7 @@ void kop_random_pk(
     
     randombytes(seed, sizeof(seed));
     kop_ec_gen_pk(&r->ec, seed);
-    kop_pq_gen_pk(r->pq, &seed[2 * DECAF_448_HASH_BYTES], rho);
+    kop_pq_gen_pk(&r->pq, &seed[2 * DECAF_448_HASH_BYTES], rho);
 }
 
 void kop_hash_pks(
@@ -66,6 +66,6 @@ void kop_hash_pks(
     KECCAK_UNWRAP(Keccak_HashFinal(&hi, NULL));
     KECCAK_UNWRAP(Keccak_HashSqueeze(&hi, seed, 8 * sizeof(seed)));
     kop_ec_gen_pk(&r->ec, seed);
-    kop_pq_gen_pk(r->pq, &seed[2 * DECAF_448_HASH_BYTES], rho);
+    kop_pq_gen_pk(&r->pq, &seed[2 * DECAF_448_HASH_BYTES], rho);
 }
 

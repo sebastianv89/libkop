@@ -48,18 +48,18 @@ static void measure_group_ec(float seconds) {
 
 static void measure_group_pq(float seconds) {
     uint8_t seed[KOP_KYBER_SYMBYTES], rho[KOP_KYBER_SYMBYTES];
-    uint8_t a[KOP_PQ_PK_BYTES], b[KOP_PQ_PK_BYTES];
+    kop_pq_pk_s a, b;
 
     randombytes(seed, sizeof(seed));
     randombytes(rho, sizeof(rho));
-    kop_pq_gen_pk(a, seed, rho);
-    kop_pq_gen_pk(b, seed, rho);
+    kop_pq_gen_pk(&a, seed, rho);
+    kop_pq_gen_pk(&b, seed, rho);
 
     printf("  group PQ\n");
 
-    TIME_OPERATION_SECONDS(kop_pq_add_pk(a, a, b), "add", seconds)
-    TIME_OPERATION_SECONDS(kop_pq_sub_pk(a, a, b), "sub", seconds)
-    TIME_OPERATION_SECONDS(kop_pq_gen_pk(a, seed, rho), "gen", seconds)
+    TIME_OPERATION_SECONDS(kop_pq_add_pk(&a, &a, &b), "add", seconds)
+    TIME_OPERATION_SECONDS(kop_pq_sub_pk(&a, &a, &b), "sub", seconds)
+    TIME_OPERATION_SECONDS(kop_pq_gen_pk(&a, seed, rho), "gen", seconds)
 }
 
 static void measure_group(float seconds) {
@@ -106,15 +106,15 @@ static void measure_kem_ec(float seconds)
 
 static void measure_kem_pq(float seconds)
 {
-    uint8_t pk[KOP_PQ_PK_BYTES];
+    kop_pq_pk_s pk;
     uint8_t sk[KOP_PQ_SK_BYTES];
     uint8_t ct[KOP_PQ_CT_BYTES];
     uint8_t ss[KOP_PQ_SS_BYTES];
 
     printf("  KEM PQ: %s\n", XSTR(KOP_KEM_ALG));
 
-    TIME_OPERATION_SECONDS(kop_pq_keygen(pk, sk), "keygen", seconds)
-    TIME_OPERATION_SECONDS(kop_pq_encaps(ct, ss, pk), "encaps", seconds)
+    TIME_OPERATION_SECONDS(kop_pq_keygen(&pk, sk), "keygen", seconds)
+    TIME_OPERATION_SECONDS(kop_pq_encaps(ct, ss, &pk), "encaps", seconds)
     TIME_OPERATION_SECONDS(kop_pq_decaps(ss, ct, sk), "decaps", seconds)
 }
 
