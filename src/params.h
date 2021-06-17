@@ -5,7 +5,7 @@
 #include <decaf/point_448.h>
 
 #ifndef KOP_PQ_ALG
-#define KOP_PQ_ALG kyber_768
+#define KOP_PQ_ALG kyber_1024
 #endif
 
 #ifndef KOP_SID_BYTES
@@ -36,9 +36,8 @@
 #define KOP_PQ_SS_BYTES KOP_PQ_namespace(length_shared_secret)
 
 #define KOP_EC_PK_BYTES DECAF_448_SER_BYTES
-#define KOP_EC_SK_BYTES DECAF_448_SCALAR_BYTES
 #define KOP_EC_CT_BYTES DECAF_448_SER_BYTES
-#define KOP_EC_SS_BYTES 32
+#define KOP_EC_SS_BYTES DECAF_448_SER_BYTES
 
 #define KOP_KEM_PK_BYTES (KOP_EC_PK_BYTES + KOP_PQ_PK_BYTES)
 #define KOP_KEM_CT_BYTES (KOP_EC_CT_BYTES + KOP_PQ_CT_BYTES)

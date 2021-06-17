@@ -9,7 +9,6 @@
 
 typedef struct {
     decaf_448_scalar_t sk;
-    uint8_t s[DECAF_448_SER_BYTES];
 } kop_ec_sk_s;
 
 typedef struct {

@@ -97,7 +97,7 @@ static void measure_kem_ec(float seconds)
     kop_ec_sk_s sk;
     uint8_t ct[KOP_EC_CT_BYTES], ss[KOP_EC_SS_BYTES];
 
-    printf("  KEM EC: ECIES Decaf448\n");
+    printf("  KEM EC: Decaf/Goldilocks\n");
 
     TIME_OPERATION_SECONDS(kop_ec_keygen(&pk, &sk), "keygen", seconds)
     TIME_OPERATION_SECONDS(kop_ec_encaps(ct, ss, &pk), "encaps", seconds)

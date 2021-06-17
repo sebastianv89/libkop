@@ -6,7 +6,7 @@
 #include "params.h"
 
 #ifndef KYBER_K
-#define KYBER_K 3
+#define KYBER_K 4
 #endif
 
 #define KYBER_N 256
