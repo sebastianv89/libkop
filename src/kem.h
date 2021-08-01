@@ -5,7 +5,7 @@
 
 #include "ec.h"
 #include "pq.h"
-#include "types.h"
+#include "common.h"
 #include "params.h"
 
 typedef struct {

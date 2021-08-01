@@ -46,7 +46,7 @@ static void test_ec()
 
 static void test_pq()
 {
-    uint8_t seed[KOP_KYBER_SYMBYTES], rho[KOP_KYBER_SYMBYTES];
+    uint8_t seed[KYBER_SYMBYTES], rho[KYBER_SYMBYTES];
     kop_pq_pk_s a, b, c;
 
     randombytes(rho, sizeof(rho));
@@ -63,9 +63,9 @@ static void test_pq()
 static void test_group()
 {
     kop_kem_pk_s a, b, c, pk;
-    uint8_t rho[KOP_KYBER_SYMBYTES];
-    uint8_t pk_serialized[(KOP_OT_N - 1) * KOP_KEM_PK_BYTES];
-    const uint8_t * pk_pointers[KOP_OT_N - 1];
+    uint8_t rho[KYBER_SYMBYTES];
+    uint8_t pk_serialized[(KOP_OT_M - 1) * KOP_KEM_PK_BYTES];
+    const uint8_t * pk_pointers[KOP_OT_M - 1];
     size_t j;
     hid_t hid = {0};
 
@@ -77,7 +77,7 @@ static void test_group()
     assert(decaf_448_point_eq(a.ec.pk, c.ec.pk) == DECAF_TRUE);
     assert(kop_pq_pk_eq(&a.pq, &c.pq));
 
-    for (j = 0; j < KOP_OT_N - 1; j++) {
+    for (j = 0; j < KOP_OT_M - 1; j++) {
         kop_random_pk(&pk, rho);
         kop_kem_pk_serialize(&pk_serialized[j * KOP_KEM_PK_BYTES], &pk);
         pk_pointers[j] = &pk_serialized[j * KOP_KEM_PK_BYTES];

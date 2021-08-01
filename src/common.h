@@ -5,6 +5,11 @@
 #include <stdint.h>
 #include <decaf/common.h>
 
+typedef enum {
+    KOP_RESULT_OK = 0,
+    KOP_RESULT_ERROR = -1,
+} kop_result_e;
+
 #ifdef KOP_DEBUG
 #include <stdlib.h>
 #else

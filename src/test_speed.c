@@ -10,7 +10,7 @@
 #include "pq.h"
 #include "kem.h"
 #include "ot.h"
-#include "pet.h"
+#include "pec.h"
 #include "params.h"
 #include "randombytes.h"
 
@@ -47,7 +47,7 @@ static void measure_group_ec(float seconds) {
 }
 
 static void measure_group_pq(float seconds) {
-    uint8_t seed[KOP_KYBER_SYMBYTES], rho[KOP_KYBER_SYMBYTES];
+    uint8_t seed[KYBER_SYMBYTES], rho[KYBER_SYMBYTES];
     kop_pq_pk_s a, b;
 
     randombytes(seed, sizeof(seed));
@@ -64,14 +64,14 @@ static void measure_group_pq(float seconds) {
 
 static void measure_group(float seconds) {
     kop_kem_pk_s a, b, pk;
-    uint8_t rho[KOP_KYBER_SYMBYTES];
-    uint8_t pks_serialized[(KOP_OT_N - 1) * KOP_KEM_PK_BYTES];
-    const uint8_t * pk_pointers[KOP_OT_N - 1];
+    uint8_t rho[KYBER_SYMBYTES];
+    uint8_t pks_serialized[(KOP_OT_M - 1) * KOP_KEM_PK_BYTES];
+    const uint8_t * pk_pointers[KOP_OT_M - 1];
     size_t j;
     hid_t hid;
 
     randombytes(rho, sizeof(rho));
-    for (j = 0; j < KOP_OT_N - 1; j++) {
+    for (j = 0; j < KOP_OT_M - 1; j++) {
         kop_random_pk(&pk, rho);
         kop_kem_pk_serialize(&pks_serialized[j * KOP_KEM_PK_BYTES], &pk);
         pk_pointers[j] = &pks_serialized[j * KOP_KEM_PK_BYTES];
@@ -79,9 +79,9 @@ static void measure_group(float seconds) {
     kop_random_pk(&a, rho);
     kop_random_pk(&b, rho);
     randombytes(hid.sid, KOP_SID_BYTES);
-    hid.oenc = 0;
+    hid.role = 0;
     hid.ot = 0;
-    hid.kem = 0;
+    hid.ro = 0;
 
     printf("  group\n");
 
@@ -135,7 +135,7 @@ static void measure_kem(float seconds)
 
 static void measure_ot(float seconds)
 {
-    kop_kem_ss_s secret, secrets[KOP_OT_N];
+    kop_kem_ss_s secret, secrets[KOP_OT_M];
     kop_ot_recv_s recv;
     uint8_t recv_msg[KOP_OT_MSG0_BYTES];
     uint8_t send_msg[KOP_OT_MSG1_BYTES];
@@ -143,38 +143,39 @@ static void measure_ot(float seconds)
     hid_t hid;
 
     randombytes(hid.sid, KOP_SID_BYTES);
-    hid.oenc = 0;
+    hid.role = 0;
     hid.ot = 0;
     index = 0;
 
-    printf("  OT: %s, N=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_N);
+    printf("  OT: %s, M=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_M);
 
     TIME_OPERATION_SECONDS(kop_ot_recv_init(&recv, recv_msg, index, hid), "recv init", seconds)
     TIME_OPERATION_SECONDS(kop_ot_send(secrets, send_msg, recv_msg, hid), "send", seconds)
     TIME_OPERATION_SECONDS(kop_ot_recv_out(&secret, send_msg, &recv), "recv out", seconds)
 }
 
-static void measure_pet(float seconds)
+static void measure_pec(float seconds)
 {
     uint8_t sid[KOP_SID_BYTES], input[KOP_INPUT_BYTES];
-    kop_pet_state_s alice, bob;
-    uint8_t msg0[KOP_PET_MSG0_BYTES];
-    uint8_t msg1[KOP_PET_MSG1_BYTES];
-    uint8_t msg2[KOP_PET_MSG2_BYTES];
-    uint8_t msg3[KOP_PET_MSG3_BYTES];
+    kop_pec_state_s alice, bob;
+    uint8_t msg0[KOP_PEC_MSG0_BYTES];
+    uint8_t msg1[KOP_PEC_MSG1_BYTES];
+    uint8_t msg2[KOP_PEC_MSG2_BYTES];
+    uint8_t msg3[KOP_PEC_MSG3_BYTES];
+    int accept;
 
     randombytes(sid, KOP_SID_BYTES);
     randombytes(input, KOP_INPUT_BYTES);
-    kop_pet_init(&bob, input, sid);
+    kop_pec_init(&bob, input, sid);
 
-    printf("  PET: %s, N=%u, σ=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_N, KOP_SIGMA);
+    printf("  PEC: %s, M=%u, N=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_M, KOP_PEC_N);
 
-    TIME_OPERATION_SECONDS(kop_pet_init(&alice, input, sid), "init", seconds)
-    TIME_OPERATION_SECONDS(kop_pet_alice_m0(&alice, msg0), "alice m0", seconds)
-    TIME_OPERATION_SECONDS(kop_pet_bob_m1(&bob, msg1, msg0), "bob m1", seconds)
-    TIME_OPERATION_SECONDS(kop_pet_alice_m2(&alice, msg2, msg1), "alice m2", seconds)
-    TIME_OPERATION_SECONDS(kop_pet_bob_m3(&bob, msg3, msg2), "bob m3", seconds)
-    TIME_OPERATION_SECONDS(kop_pet_alice_accept(&alice, msg3), "alice accept", seconds)
+    TIME_OPERATION_SECONDS(kop_pec_init(&alice, input, sid), "init", seconds)
+    TIME_OPERATION_SECONDS(kop_pec_alice_m0(&alice, msg0), "alice m0", seconds)
+    TIME_OPERATION_SECONDS(kop_pec_bob_m1(&bob, msg1, msg0), "bob m1", seconds)
+    TIME_OPERATION_SECONDS(kop_pec_alice_m2(&alice, msg2, msg1), "alice m2", seconds)
+    TIME_OPERATION_SECONDS(kop_pec_bob_m3(&accept, &bob, msg3, msg2), "bob m3", seconds)
+    TIME_OPERATION_SECONDS(kop_pec_alice_accept(&accept, &alice, msg3), "alice accept", seconds)
 }
 
 
@@ -199,7 +200,7 @@ int main(int argc, char *argv[])
     measure_kem_pq(seconds);
     measure_kem(seconds);
     measure_ot(seconds);
-    measure_pet(seconds);
+    measure_pec(seconds);
     PRINT_TIMER_FOOTER
 
     return EXIT_SUCCESS;

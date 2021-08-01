@@ -9,7 +9,6 @@
 #include "pq.h"
 #include "common.h"
 #include "params.h"
-#include "types.h"
 
 #define XSTR(s) STR(s)
 #define STR(s) #s

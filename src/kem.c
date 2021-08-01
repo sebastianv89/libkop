@@ -7,7 +7,6 @@
 #include "ec.h"
 #include "pq.h"
 #include "common.h"
-#include "types.h"
 #include "randombytes.h"
 
 static void kop_kdf(
@@ -21,7 +20,7 @@ static void kop_kdf(
     KECCAK_UNWRAP(Keccak_HashInitialize_SHAKE256(&hi));
     // domain separation
     KECCAK_UNWRAP(Keccak_HashUpdate(&hi, prefix, 8 * sizeof(prefix)));
-    // hash keys and ciphertext
+    // hash shared secrets
     KECCAK_UNWRAP(Keccak_HashUpdate(&hi, ec_ss, 8 * KOP_EC_SS_BYTES));
     KECCAK_UNWRAP(Keccak_HashUpdate(&hi, pq_ss, 8 * KOP_PQ_SS_BYTES));
     // output

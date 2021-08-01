@@ -1,11 +1,11 @@
 libkop
 ======
 
-KOP stands for (*K*EM-based *O*T)-based *P*ET,
+KOP stands for (*K*EM-based *O*T)-based *P*EC,
 which uses the following acronyms:
 - KEM: Key Encapsulation Mechanism
 - OT: Oblivious Transfer
-- PET: Private Equality Test
+- PEC: Private Equality Confirmation
 
 The KOP allows secure comparison of low-entropy values, which can be used (for
 example) in Off-the-Record messaging (OTR) for user authentication. In OTR

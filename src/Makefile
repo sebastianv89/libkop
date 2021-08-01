@@ -7,13 +7,13 @@ TESTFLAGS = -gdwarf-4 -O0 -DKOP_DEBUG -march=native \
 	    -I./xkcp/libXKCP.a.headers $(EXTRAFLAGS)
 LIBS = -L./xkcp -lXKCP -ldecaf -loqs
 RM = /bin/rm
-TESTS = test_group test_kem test_ot test_pet test_speed
+TESTS = test_group test_kem test_ot test_pec test_speed
 
 # TODO: implement a way to automatically compile libXKCP
 
 LIB = libkop.a
-HEADERS = pet.h ot.h kem.h group.h ec.h pq.h common.h randombytes.h params.h types.h
-OBJECTS = pet.o ot.o kem.o group.o ec.o pq.o common.o randombytes.o
+HEADERS = pec.h ot.h kem.h group.h ec.h pq.h common.h randombytes.h params.h
+OBJECTS = pec.o ot.o kem.o group.o ec.o pq.o common.o randombytes.o
 
 all: $(LIB) $(TESTS)
 

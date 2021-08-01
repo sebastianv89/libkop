@@ -8,7 +8,6 @@
 
 #include "ec.h"
 #include "common.h"
-#include "types.h"
 #include "randombytes.h"
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))

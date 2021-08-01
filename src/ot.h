@@ -7,6 +7,7 @@
 #include "params.h"
 #include "kem.h"
 #include "group.h"
+#include "common.h"
 
 typedef uint8_t kop_ot_index_t;
 
@@ -22,7 +23,7 @@ void kop_ot_recv_init(
     hid_t hid);
 
 kop_result_e kop_ot_send(
-    kop_kem_ss_s secrets[KOP_OT_N],
+    kop_kem_ss_s secrets[KOP_OT_M],
     uint8_t msg_out[KOP_OT_MSG1_BYTES],
     const uint8_t msg_in[KOP_OT_MSG0_BYTES],
     hid_t hid);

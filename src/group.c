@@ -31,9 +31,9 @@ void kop_sub_pk(
 
 void kop_random_pk(
     kop_kem_pk_s *r,
-    const uint8_t rho[KOP_KYBER_SYMBYTES])
+    const uint8_t rho[KYBER_SYMBYTES])
 {
-    uint8_t seed[2 * DECAF_448_HASH_BYTES + KOP_KYBER_SYMBYTES];
+    uint8_t seed[2 * DECAF_448_HASH_BYTES + KYBER_SYMBYTES];
     
     randombytes(seed, sizeof(seed));
     kop_ec_gen_pk(&r->ec, seed);
@@ -42,12 +42,12 @@ void kop_random_pk(
 
 void kop_hash_pks(
     kop_kem_pk_s *r,
-    const uint8_t * const pks[KOP_OT_N - 1],
-    const uint8_t rho[KOP_KYBER_SYMBYTES],
+    const uint8_t * const pks[KOP_OT_M - 1],
+    const uint8_t rho[KYBER_SYMBYTES],
     hid_t hid)
 {
     uint8_t prefix[6] = {0x4b, 0x4f, 0x50, 0x2d, 0x52, 0x4f}; // "KOP-RO"
-    uint8_t seed[2 * DECAF_448_HASH_BYTES + KOP_KYBER_SYMBYTES];
+    uint8_t seed[2 * DECAF_448_HASH_BYTES + KYBER_SYMBYTES];
     Keccak_HashInstance hi;
     size_t i;
 
@@ -55,11 +55,11 @@ void kop_hash_pks(
     // domain separation
     KECCAK_UNWRAP(Keccak_HashUpdate(&hi, prefix, 8 * sizeof(prefix)));
     KECCAK_UNWRAP(Keccak_HashUpdate(&hi, hid.sid, 8 * KOP_SID_BYTES));
-    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, &hid.oenc, 8));
+    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, &hid.role, 8));
     KECCAK_UNWRAP(Keccak_HashUpdate(&hi, &hid.ot, 8));
-    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, &hid.kem, 8));
+    KECCAK_UNWRAP(Keccak_HashUpdate(&hi, &hid.ro, 8));
     // input data
-    for (i = 0; i < KOP_OT_N - 1; i++) {
+    for (i = 0; i < KOP_OT_M - 1; i++) {
         KECCAK_UNWRAP(Keccak_HashUpdate(&hi, pks[i], 8 * KOP_KEM_PK_BYTES));
     }
     // get output

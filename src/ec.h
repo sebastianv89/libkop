@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <decaf/point_448.h>
 
+#include "common.h"
 #include "params.h"
-#include "types.h"
 
 typedef struct {
     decaf_448_scalar_t sk;

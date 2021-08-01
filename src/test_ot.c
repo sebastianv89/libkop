@@ -9,7 +9,6 @@
 #include "group.h"
 #include "common.h"
 #include "params.h"
-#include "types.h"
 #include "randombytes.h"
 
 #define XSTR(s) STR(s)
@@ -18,7 +17,7 @@
 static void test_ot()
 {
     kop_result_e res;
-    kop_kem_ss_s secret, secrets[KOP_OT_N];
+    kop_kem_ss_s secret, secrets[KOP_OT_M];
     kop_ot_recv_s recv;
     uint8_t msg0[KOP_OT_MSG0_BYTES];
     uint8_t msg1[KOP_OT_MSG1_BYTES];
@@ -27,16 +26,16 @@ static void test_ot()
     kop_ot_index_t i, j;
 
     randombytes(hid.sid, KOP_SID_BYTES);
-    hid.oenc = 0;
+    hid.role = 0;
     hid.ot = 0;
 
-    for (ui = 0; ui < KOP_OT_N; ui++) {
+    for (ui = 0; ui < KOP_OT_M; ui++) {
         i = (kop_ot_index_t)(ui);
         kop_ot_recv_init(&recv, msg0, i, hid);
         res = kop_ot_send(secrets, msg1, msg0, hid);
         assert(res == KOP_RESULT_OK);
         kop_ot_recv_out(&secret, msg1, &recv);
-        for (uj = 0; uj < KOP_OT_N; uj++) {
+        for (uj = 0; uj < KOP_OT_M; uj++) {
             j = (kop_ot_index_t)(uj);
             assert(verify(secret.bytes, secrets[j].bytes, KOP_KEM_SS_BYTES) == (i != j));
         }
@@ -45,7 +44,7 @@ static void test_ot()
 
 static void print_sizes()
 {
-    printf("%s, N=%u\n", XSTR(KOP_PQ_ALG), KOP_OT_N);
+    printf("%s, M=%u\n", XSTR(KOP_PQ_ALG), KOP_OT_M);
     printf("M0, R -> S: %8u bytes (N public keys)\n", KOP_OT_MSG0_BYTES);
     printf("M1, S -> R: %8u bytes (N ciphertexts)\n", KOP_OT_MSG1_BYTES);
 }
