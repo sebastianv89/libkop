@@ -66,7 +66,7 @@ void kop_ot_recv_out(
     const uint8_t msg_in[KOP_OT_MSG1_BYTES],
     const kop_ot_recv_s *state)
 {
-    uint8_t ct[KOP_KEM_CT_BYTES];
+    uint8_t ct[KOP_KEM_CT_BYTES] = {0};
     uint8_t b;
     size_t i;
 
