@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "poison.h"
+
 #include "ot.h"
 #include "kem.h"
 #include "group.h"
@@ -42,6 +44,34 @@ static void test_ot()
     }
 }
 
+static void test_sidechannels() {
+    kop_kem_ss_s secret, secrets[KOP_OT_M];
+    kop_ot_recv_s recv;
+    uint8_t msg0[KOP_OT_MSG0_BYTES];
+    uint8_t msg1[KOP_OT_MSG1_BYTES];
+    hid_t hid;
+    unsigned int ui;
+    kop_ot_index_t i;
+
+    randombytes(hid.sid, KOP_SID_BYTES);
+    hid.role = 0;
+    hid.ot = 0;
+
+    poison(&secret, sizeof(kop_kem_ss_s));
+    poison(secrets, KOP_OT_M * sizeof(kop_kem_ss_s));
+    poison(&recv, sizeof(kop_ot_recv_s));
+
+    for (ui = 0; ui < KOP_OT_M; ui++) {
+        i = (kop_ot_index_t)(ui);
+        kop_ot_recv_init(&recv, msg0, i, hid);
+        poison(&recv, sizeof(kop_ot_recv_s));
+        unpoison(msg0, KOP_OT_MSG0_BYTES);
+        kop_ot_send(secrets, msg1, msg0, hid);
+        unpoison(msg1, KOP_OT_MSG1_BYTES);
+        kop_ot_recv_out(&secret, msg1, &recv);
+    }
+}
+
 static void print_sizes()
 {
     printf("%s, M=%u\n", XSTR(KOP_PQ_ALG), KOP_OT_M);
@@ -66,6 +96,8 @@ int main(int argc, char *argv[])
     for (i = 0; i < nr_of_tests; i++) {
         test_ot();
     }
+
+    test_sidechannels();
 
     return EXIT_SUCCESS;
 }

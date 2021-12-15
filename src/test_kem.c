@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "poison.h"
+
 #include "kem.h"
 #include "ec.h"
 #include "pq.h"
@@ -55,6 +57,27 @@ static void test_kem()
     assert(verify(ss0.bytes, ss1.bytes, KOP_KEM_SS_BYTES) == 0);
 }
 
+static void test_sidechannels()
+{
+    kop_kem_pk_s pk;
+    kop_kem_sk_s sk;
+    uint8_t ct[KOP_KEM_CT_BYTES];
+    kop_kem_ss_s ss0, ss1;
+
+    poison(&sk, sizeof(kop_kem_sk_s));
+    poison(&ss0, sizeof(kop_kem_ss_s));
+    poison(&ss1, sizeof(kop_kem_ss_s));
+
+    kop_kem_keygen(&pk, &sk);
+    poison(&sk, sizeof(kop_kem_sk_s));
+    unpoison(&pk, sizeof(kop_kem_pk_s));
+    kop_kem_encaps(ct, &ss0, &pk);
+    poison(&ss0, sizeof(kop_kem_ss_s));
+    unpoison(ct, KOP_KEM_CT_BYTES);
+    kop_kem_decaps(&ss1, ct, &sk);
+    poison(&ss1, sizeof(kop_kem_ss_s));
+}
+
 static void print_sizes()
 {
     printf("%s\n", XSTR(KOP_PQ_ALG));
@@ -81,6 +104,8 @@ int main(int argc, char *argv[])
         test_kem_pq();
         test_kem();
     }
+
+    test_sidechannels();
 
     return EXIT_SUCCESS;
 }

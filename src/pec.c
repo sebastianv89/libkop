@@ -11,6 +11,10 @@
 #include "group.h"
 #include "ot.h"
 
+#ifdef KOP_TEST
+#include "poison.h"
+#endif
+
 static void words_from_bytes(
     kop_ot_index_t words[KOP_PEC_N],
     const uint8_t bytes[KOP_INPUT_BYTES])
@@ -338,6 +342,10 @@ void kop_pec_bob_m3(
     *accept = 1 - verify(local_encoding, msg_in, KOP_PEC_LAMBDA_BYTES);
     memset(msg_out, 0, KOP_PEC_MSG3_BYTES);
     msg_out[0] = (uint8_t)(*accept);
+#ifdef KOP_TEST
+    // the accept bit can leak
+    unpoison(accept, sizeof(int));
+#endif
     if (*accept == 1) {
         memcpy(&msg_out[1], local_msg_out, KOP_PEC_LAMBDA_BYTES);
     }
@@ -354,6 +362,10 @@ kop_result_e kop_pec_alice_accept(
     }
 
     *accept = 1 - verify(state->encoding, &msg_in[1], KOP_PEC_LAMBDA_BYTES);
+#ifdef KOP_TEST
+    // the accept bit can leak
+    unpoison(accept, sizeof(int));
+#endif
     if (*accept == 0) {
         return KOP_RESULT_ERROR;
     }

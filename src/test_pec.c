@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "poison.h"
+
 #include "pec.h"
 #include "common.h"
 #include "params.h"
@@ -79,6 +81,36 @@ static void test_pec()
     test_overlap(x, x, sid);
 }
 
+static void test_sidechannels()
+{
+    uint8_t x[KOP_INPUT_BYTES], y[KOP_INPUT_BYTES], sid[KOP_SID_BYTES];
+    kop_pec_state_s alice, bob;
+    uint8_t msg0[KOP_PEC_MSG0_BYTES];
+    uint8_t msg1[KOP_PEC_MSG1_BYTES];
+    uint8_t msg2[KOP_PEC_MSG2_BYTES];
+    uint8_t msg3[KOP_PEC_MSG3_BYTES];
+    int accept;
+
+    randombytes(x, KOP_INPUT_BYTES);
+    randombytes(y, KOP_INPUT_BYTES);
+    randombytes(sid, KOP_SID_BYTES);
+
+    poison(x, KOP_INPUT_BYTES);
+    poison(y, KOP_INPUT_BYTES);
+
+    kop_pec_init(&alice, x, sid);
+    kop_pec_init(&bob, x, sid);
+    kop_pec_alice_m0(&alice, msg0);
+    unpoison(msg0, KOP_PEC_MSG0_BYTES);
+    kop_pec_bob_m1(&bob, msg1, msg0);
+    unpoison(msg1, KOP_PEC_MSG1_BYTES);
+    kop_pec_alice_m2(&alice, msg2, msg1);
+    unpoison(msg2, KOP_PEC_MSG2_BYTES);
+    kop_pec_bob_m3(&accept, &bob, msg3, msg2);
+    unpoison(msg3, KOP_PEC_MSG3_BYTES);
+    kop_pec_alice_accept(&accept, &alice, msg3);
+}
+
 static void print_sizes()
 {
     printf("%s, M=%u, N=%u\n", XSTR(KOP_PQ_ALG), KOP_OT_M, KOP_PEC_N);
@@ -105,6 +137,8 @@ int main(int argc, char *argv[])
     for (i = 0; i < nr_of_tests; i++) {
         test_pec();
     }
+
+    test_sidechannels();
 
     return EXIT_SUCCESS;
 }

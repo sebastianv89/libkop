@@ -2,9 +2,9 @@ CC ?= /usr/bin/cc
 CFLAGS += -O3 -march=native -fomit-frame-pointer \
 	  -Wall -Wextra -Wmissing-prototypes -Wredundant-decls -Wshadow -Wpointer-arith \
 	  -I./xkcp/libXKCP.a.headers $(EXTRAFLAGS)
-TESTFLAGS = -gdwarf-4 -O0 -DKOP_DEBUG -march=native \
+TESTFLAGS = -gdwarf-4 -O0 -DKOP_DEBUG -DKOP_TEST -march=native \
 	    -Wall -Wextra -Wmissing-prototypes -Wredundant-decls -Wshadow -Wpointer-arith \
-	    -I./xkcp/libXKCP.a.headers $(EXTRAFLAGS)
+	    -I/usr/include/valgrind -I./xkcp/libXKCP.a.headers $(EXTRAFLAGS)
 LIBS = -L./xkcp -lXKCP -ldecaf -loqs
 RM = /bin/rm
 TESTS = test_group test_kem test_ot test_pec test_speed
@@ -26,7 +26,7 @@ $(LIB): $(OBJECTS)
 test_speed: test_speed.c $(OBJECTS:.o=.c) $(HEADERS) ds_benchmark.h
 	$(CC) $(CFLAGS) -o $@ $< $(OBJECTS:.o=.c) -lm $(LIBS)
 
-test_%: test_%.c $(OBJECTS:.o=.c) $(HEADERS)
+test_%: test_%.c $(OBJECTS:.o=.c) $(HEADERS) poison.h
 	$(CC) $(TESTFLAGS) -o $@ $< $(OBJECTS:.o=.c) $(LIBS)
 
 .PHONY: clean
