@@ -236,13 +236,17 @@ static void kop_ots_recv_out(
     }
 }
 
-void kop_pec_init(
+void kop_pec_set_input(
     kop_pec_state_s *state,
-    const uint8_t input[KOP_INPUT_BYTES],
+    const uint8_t input[KOP_INPUT_BYTES])
+{
+    memcpy(state->input, input, KOP_INPUT_BYTES);
+}
+
+void kop_pec_set_sid(
+    kop_pec_state_s *state,
     const uint8_t sid[KOP_SID_BYTES])
 {
-    memset(state, 0, sizeof(kop_pec_state_s));
-    memcpy(state->input, input, KOP_INPUT_BYTES);
     memcpy(state->hid.sid, sid, KOP_SID_BYTES);
 }
 
@@ -262,14 +266,12 @@ kop_result_e kop_pec_bob_m1(
     uint8_t msg_out[KOP_PEC_MSG1_BYTES],
     const uint8_t msg_in[KOP_PEC_MSG0_BYTES])
 {
-    uint8_t local_msg_in[KOP_PEC_MSG0_BYTES];
     kop_result_e res;
     kop_ot_index_t indices[KOP_PEC_N];
     
-    memcpy(local_msg_in, msg_in, KOP_PEC_MSG0_BYTES);
     words_from_bytes(indices, state->input);
     state->hid.role = 0;
-    KOP_TRY(kop_ots_send(state->encoding, msg_out, local_msg_in, indices, state->hid));
+    KOP_TRY(kop_ots_send(state->encoding, msg_out, msg_in, indices, state->hid));
     // state->encoding == B(y)
     state->hid.role = 1;
     kop_ots_recv_init(state->recv, &msg_out[KOP_PEC_N * KOP_OT_MSG1_BYTES], indices, state->hid);
@@ -281,13 +283,13 @@ kop_result_e kop_pec_alice_m2(
     uint8_t msg_out[KOP_PEC_MSG2_BYTES],
     const uint8_t msg_in[KOP_PEC_MSG1_BYTES])
 {
-    uint8_t local_msg_out[KOP_PEC_MSG2_BYTES], tmp[KOP_PEC_LAMBDA_BYTES];
+    uint8_t tmp[KOP_PEC_LAMBDA_BYTES];
     kop_ot_index_t indices[KOP_PEC_N];
     kop_result_e res;
     size_t i;
 
     state->hid.role = 0;
-    kop_ots_recv_out(local_msg_out, msg_in, state->recv);
+    kop_ots_recv_out(msg_out, msg_in, state->recv);
     // local_msg_out == B(x)
     for (i = 0; i < KOP_PEC_N; i++) {
         indices[i] = state->recv[i].index;
@@ -295,7 +297,7 @@ kop_result_e kop_pec_alice_m2(
     state->hid.role = 1;
     KOP_TRY(kop_ots_send(
         state->encoding,
-        &local_msg_out[KOP_PEC_LAMBDA_BYTES],
+        &msg_out[KOP_PEC_LAMBDA_BYTES],
         &msg_in[KOP_PEC_N * KOP_OT_MSG1_BYTES],
         indices,
         state->hid)
@@ -304,19 +306,17 @@ kop_result_e kop_pec_alice_m2(
     kop_pec_g(tmp, state->encoding);
     // tmp == G(A(x))
     for (i = 0; i < KOP_PEC_LAMBDA_BYTES; i++) {
-        state->encoding[i] ^= local_msg_out[i];
+        state->encoding[i] ^= msg_out[i];
     }
     // state->encoding == A(x) ^ B(x)
     for (i = 0; i < KOP_PEC_LAMBDA_BYTES; i++) {
-        local_msg_out[i] ^= tmp[i];
+        msg_out[i] ^= tmp[i];
     }
-    // local_msg_out == G(A(x)) ^ B(x)
-    memcpy(msg_out, local_msg_out, KOP_PEC_MSG2_BYTES);
+    // msg_out == G(A(x)) ^ B(x)
     return KOP_RESULT_OK;
 }
 
 void kop_pec_bob_m3(
-    int *accept,
     kop_pec_state_s *state,
     uint8_t msg_out[KOP_PEC_MSG3_BYTES],
     const uint8_t msg_in[KOP_PEC_MSG2_BYTES])
@@ -339,34 +339,33 @@ void kop_pec_bob_m3(
         local_encoding[i] ^= state->encoding[i];
     }
     // local_encoding == G(A(y)) ^ B(y)
-    *accept = 1 - verify(local_encoding, msg_in, KOP_PEC_LAMBDA_BYTES);
+    state->accept = 1 - verify(local_encoding, msg_in, KOP_PEC_LAMBDA_BYTES);
     memset(msg_out, 0, KOP_PEC_MSG3_BYTES);
-    msg_out[0] = (uint8_t)(*accept);
+    msg_out[0] = (uint8_t)(state->accept);
 #ifdef KOP_TEST
     // the accept bit can leak
-    unpoison(accept, sizeof(int));
+    unpoison(&state->accept, sizeof(int));
 #endif
-    if (*accept == 1) {
+    if (state->accept == 1) {
         memcpy(&msg_out[1], local_msg_out, KOP_PEC_LAMBDA_BYTES);
     }
 }
 
 kop_result_e kop_pec_alice_accept(
-    int *accept,
     kop_pec_state_s *state,
     const uint8_t msg_in[KOP_PEC_MSG3_BYTES])
 {
     if (msg_in[0] == 0) {
-        *accept = 0;
+        state->accept = 0;
         return KOP_RESULT_OK;
     }
 
-    *accept = 1 - verify(state->encoding, &msg_in[1], KOP_PEC_LAMBDA_BYTES);
+    state->accept = 1 - verify(state->encoding, &msg_in[1], KOP_PEC_LAMBDA_BYTES);
 #ifdef KOP_TEST
     // the accept bit can leak
-    unpoison(accept, sizeof(int));
+    unpoison(state->accept, sizeof(int));
 #endif
-    if (*accept == 0) {
+    if (state->accept == 0) {
         return KOP_RESULT_ERROR;
     }
     return KOP_RESULT_OK;

@@ -11,6 +11,7 @@
 #include "kem.h"
 #include "ot.h"
 #include "pec.h"
+#include "split.h"
 #include "params.h"
 #include "randombytes.h"
 
@@ -162,22 +163,50 @@ static void measure_pec(float seconds)
     uint8_t msg1[KOP_PEC_MSG1_BYTES];
     uint8_t msg2[KOP_PEC_MSG2_BYTES];
     uint8_t msg3[KOP_PEC_MSG3_BYTES];
-    int accept;
 
     randombytes(sid, KOP_SID_BYTES);
     randombytes(input, KOP_INPUT_BYTES);
-    kop_pec_init(&bob, input, sid);
+    kop_pec_set_input(&alice, input);
+    kop_pec_set_sid(&alice, sid);
+    kop_pec_set_input(&bob, input);
+    kop_pec_set_sid(&bob, sid);
 
     printf("  PEC: %s, M=%u, N=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_M, KOP_PEC_N);
 
-    TIME_OPERATION_SECONDS(kop_pec_init(&alice, input, sid), "init", seconds)
     TIME_OPERATION_SECONDS(kop_pec_alice_m0(&alice, msg0), "alice m0", seconds)
     TIME_OPERATION_SECONDS(kop_pec_bob_m1(&bob, msg1, msg0), "bob m1", seconds)
     TIME_OPERATION_SECONDS(kop_pec_alice_m2(&alice, msg2, msg1), "alice m2", seconds)
-    TIME_OPERATION_SECONDS(kop_pec_bob_m3(&accept, &bob, msg3, msg2), "bob m3", seconds)
-    TIME_OPERATION_SECONDS(kop_pec_alice_accept(&accept, &alice, msg3), "alice accept", seconds)
+    TIME_OPERATION_SECONDS(kop_pec_bob_m3(&bob, msg3, msg2), "bob m3", seconds)
+    TIME_OPERATION_SECONDS(kop_pec_alice_accept(&alice, msg3), "alice accept", seconds)
 }
 
+static void measure_split(float seconds)
+{
+    uint8_t sid[KOP_SID_BYTES], input[KOP_INPUT_BYTES];
+    kop_state_s alice, bob;
+    uint8_t msg0[KOP_SPLIT_MSG0_BYTES];
+    uint8_t msg1[KOP_SPLIT_MSG1_BYTES];
+    uint8_t msg2[KOP_SPLIT_MSG2_BYTES];
+    uint8_t msg3[KOP_SPLIT_MSG3_BYTES];
+    uint8_t msg4[KOP_SPLIT_MSG4_BYTES];
+    uint8_t msg5[KOP_SPLIT_MSG5_BYTES];
+
+    randombytes(sid, KOP_SID_BYTES);
+    randombytes(input, KOP_INPUT_BYTES);
+    kop_split_init(&alice, input);
+    kop_split_init(&bob, input);
+
+    printf("  PEC: %s, M=%u, N=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_M, KOP_PEC_N);
+
+    TIME_OPERATION_SECONDS(kop_split_init(&alice, input), "alice init", seconds)
+    TIME_OPERATION_SECONDS(kop_split_alice0(&alice, msg0), "alice m0", seconds)
+    TIME_OPERATION_SECONDS(kop_split_bob1(&bob, msg1, msg0), "bob m1", seconds)
+    TIME_OPERATION_SECONDS(kop_split_alice2(&alice, msg2, msg1), "alice m2", seconds)
+    TIME_OPERATION_SECONDS(kop_split_bob3(&bob, msg3, msg2), "bob m3", seconds)
+    TIME_OPERATION_SECONDS(kop_split_alice4(&alice, msg4, msg3), "alice m4", seconds)
+    TIME_OPERATION_SECONDS(kop_split_bob5(&alice, msg5, msg4), "bob m5", seconds)
+    TIME_OPERATION_SECONDS(kop_split_alice6(&alice, msg5), "alice accept", seconds)
+}
 
 int main(int argc, char *argv[])
 {
@@ -201,6 +230,7 @@ int main(int argc, char *argv[])
     measure_kem(seconds);
     measure_ot(seconds);
     measure_pec(seconds);
+    measure_split(seconds);
     PRINT_TIMER_FOOTER
 
     return EXIT_SUCCESS;

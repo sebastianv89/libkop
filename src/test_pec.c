@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -13,7 +14,6 @@
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 static void test_with_input(
     const uint8_t x[KOP_INPUT_BYTES],
@@ -26,45 +26,24 @@ static void test_with_input(
     uint8_t msg1[KOP_PEC_MSG1_BYTES];
     uint8_t msg2[KOP_PEC_MSG2_BYTES];
     uint8_t msg3[KOP_PEC_MSG3_BYTES];
-    int accept, expected = 1 - verify(x, y, KOP_INPUT_BYTES);
+    int expected = 1 - verify(x, y, KOP_INPUT_BYTES);
 
-    kop_pec_init(&alice, x, sid);
-    kop_pec_init(&bob, y, sid);
+    memset(&alice, 0, sizeof(kop_pec_state_s));
+    memset(&bob, 0, sizeof(kop_pec_state_s));
+    kop_pec_set_input(&alice, x);
+    kop_pec_set_input(&bob, y);
+    kop_pec_set_sid(&alice, sid);
+    kop_pec_set_sid(&bob, sid);
 
     kop_pec_alice_m0(&alice, msg0);
     res = kop_pec_bob_m1(&bob, msg1, msg0);
     assert(res == KOP_RESULT_OK);
     res = kop_pec_alice_m2(&alice, msg2, msg1);
     assert(res == KOP_RESULT_OK);
-    kop_pec_bob_m3(&accept, &bob, msg3, msg2);
-    assert(accept == expected);
-    res = kop_pec_alice_accept(&accept, &alice, msg3);
-    assert(accept == expected);
-    assert(res == KOP_RESULT_OK);
-}
-
-static void test_overlap(
-    const uint8_t x[KOP_INPUT_BYTES],
-    const uint8_t y[KOP_INPUT_BYTES],
-    const uint8_t sid[KOP_SID_BYTES])
-{
-    kop_result_e res;
-    kop_pec_state_s alice, bob;
-    uint8_t msg[MAX(MAX(KOP_PEC_MSG0_BYTES, KOP_PEC_MSG1_BYTES), MAX(KOP_PEC_MSG2_BYTES, KOP_PEC_MSG3_BYTES))];
-    int accept, expected = 1 - verify(x, y, KOP_INPUT_BYTES);
-
-    kop_pec_init(&alice, x, sid);
-    kop_pec_init(&bob, y, sid);
-
-    kop_pec_alice_m0(&alice, msg);
-    res = kop_pec_bob_m1(&bob, msg, msg);
-    assert(res == KOP_RESULT_OK);
-    res = kop_pec_alice_m2(&alice, msg, msg);
-    assert(res == KOP_RESULT_OK);
-    kop_pec_bob_m3(&accept, &bob, msg, msg);
-    assert(accept == expected);
-    res = kop_pec_alice_accept(&accept, &alice, msg);
-    assert(accept == expected);
+    kop_pec_bob_m3(&bob, msg3, msg2);
+    assert(bob.accept == expected);
+    res = kop_pec_alice_accept(&alice, msg3);
+    assert(alice.accept == expected);
     assert(res == KOP_RESULT_OK);
 }
 
@@ -78,7 +57,7 @@ static void test_pec()
 
     test_with_input(x, x, sid);
     test_with_input(x, y, sid);
-    test_overlap(x, x, sid);
+    // test_overlap(x, x, sid);
 }
 
 static void test_sidechannels()
@@ -89,7 +68,6 @@ static void test_sidechannels()
     uint8_t msg1[KOP_PEC_MSG1_BYTES];
     uint8_t msg2[KOP_PEC_MSG2_BYTES];
     uint8_t msg3[KOP_PEC_MSG3_BYTES];
-    int accept;
 
     randombytes(x, KOP_INPUT_BYTES);
     randombytes(y, KOP_INPUT_BYTES);
@@ -98,17 +76,19 @@ static void test_sidechannels()
     poison(x, KOP_INPUT_BYTES);
     poison(y, KOP_INPUT_BYTES);
 
-    kop_pec_init(&alice, x, sid);
-    kop_pec_init(&bob, x, sid);
+    kop_pec_set_input(&alice, x);
+    kop_pec_set_sid(&alice, sid);
+    kop_pec_set_input(&bob, y);
+    kop_pec_set_sid(&bob, sid);
     kop_pec_alice_m0(&alice, msg0);
     unpoison(msg0, KOP_PEC_MSG0_BYTES);
     kop_pec_bob_m1(&bob, msg1, msg0);
     unpoison(msg1, KOP_PEC_MSG1_BYTES);
     kop_pec_alice_m2(&alice, msg2, msg1);
     unpoison(msg2, KOP_PEC_MSG2_BYTES);
-    kop_pec_bob_m3(&accept, &bob, msg3, msg2);
+    kop_pec_bob_m3(&bob, msg3, msg2);
     unpoison(msg3, KOP_PEC_MSG3_BYTES);
-    kop_pec_alice_accept(&accept, &alice, msg3);
+    kop_pec_alice_accept(&alice, msg3);
 }
 
 static void print_sizes()

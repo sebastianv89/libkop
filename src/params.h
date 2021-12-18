@@ -2,14 +2,15 @@
 #define PARAMS_H
 
 #include <oqs/kem.h>
+#include <oqs/sig.h>
 #include <decaf/point_448.h>
 
 #ifndef KOP_PQ_ALG
 #define KOP_PQ_ALG kyber_1024
 #endif
 
-#ifndef KOP_SID_BYTES
-#define KOP_SID_BYTES 8
+#ifndef KOP_SPLIT_ALG
+#define KOP_SPLIT_ALG dilithium_5
 #endif
 
 #ifndef KOP_INPUT_BYTES
@@ -22,9 +23,12 @@
 
 /* Don't edit below this line */
 
-#define KOP_OQS_XNS(a, b) OQS_KEM_##a##_##b
-#define KOP_OQS_NS(a, b) KOP_OQS_XNS(a, b)
-#define KOP_PQ_namespace(s) KOP_OQS_NS(KOP_PQ_ALG, s)
+#define KOP_OQS_KEM_XNS(a, b) OQS_KEM_##a##_##b
+#define KOP_OQS_KEM_NS(a, b) KOP_OQS_KEM_XNS(a, b)
+#define KOP_PQ_namespace(s) KOP_OQS_KEM_NS(KOP_PQ_ALG, s)
+#define KOP_OQS_SIG_XNS(a, b) OQS_SIG_##a##_##b
+#define KOP_OQS_SIG_NS(a, b) KOP_OQS_SIG_XNS(a, b)
+#define KOP_SPLIT_namespace(s) KOP_OQS_SIG_NS(KOP_SPLIT_ALG, s)
 
 #define KOP_PQ_KEYGEN KOP_PQ_namespace(keypair)
 #define KOP_PQ_ENCAPS KOP_PQ_namespace(encaps)
@@ -34,6 +38,14 @@
 #define KOP_PQ_SK_BYTES KOP_PQ_namespace(length_secret_key)
 #define KOP_PQ_CT_BYTES KOP_PQ_namespace(length_ciphertext)
 #define KOP_PQ_SS_BYTES KOP_PQ_namespace(length_shared_secret)
+
+#define KOP_SPLIT_KEYGEN KOP_SPLIT_namespace(keypair)
+#define KOP_SPLIT_SIGN KOP_SPLIT_namespace(sign)
+#define KOP_SPLIT_VERIFY KOP_SPLIT_namespace(verify)
+
+#define KOP_SPLIT_PK_BYTES KOP_SPLIT_namespace(length_public_key)
+#define KOP_SPLIT_SK_BYTES KOP_SPLIT_namespace(length_secret_key)
+#define KOP_SPLIT_SIG_BYTES KOP_SPLIT_namespace(length_signature)
 
 #define KOP_EC_PK_BYTES DECAF_448_SER_BYTES
 #define KOP_EC_CT_BYTES DECAF_448_SER_BYTES
@@ -54,5 +66,21 @@
 #define KOP_PEC_MSG1_BYTES (KOP_PEC_N * (KOP_OT_MSG0_BYTES + KOP_OT_MSG1_BYTES))
 #define KOP_PEC_MSG2_BYTES (KOP_PEC_LAMBDA_BYTES + KOP_PEC_N * KOP_OT_MSG1_BYTES)
 #define KOP_PEC_MSG3_BYTES (1 + KOP_PEC_LAMBDA_BYTES)
+
+#define KOP_SID_BYTES (2 * KOP_SPLIT_PK_BYTES)
+
+#define KOP_SPLIT_MSG0_BYTES (1 + KOP_SPLIT_PK_BYTES)
+#define KOP_SPLIT_MSG1_BYTES (1 + (KOP_SPLIT_SIG_BYTES > KOP_SPLIT_PK_BYTES ? KOP_SPLIT_SIG_BYTES : KOP_SPLIT_PK_BYTES) + KOP_SPLIT_PK_BYTES)
+#define KOP_SPLIT_MSG2_BYTES (1 + KOP_PEC_MSG0_BYTES + (KOP_SPLIT_SIG_BYTES > KOP_SID_BYTES ? KOP_SPLIT_SIG_BYTES : KOP_SID_BYTES))
+#define KOP_SPLIT_MSG3_BYTES (1 + KOP_PEC_MSG1_BYTES + (KOP_SPLIT_SIG_BYTES > KOP_SID_BYTES ? KOP_SPLIT_SIG_BYTES : KOP_SID_BYTES))
+#define KOP_SPLIT_MSG4_BYTES (1 + KOP_PEC_MSG2_BYTES + (KOP_SPLIT_SIG_BYTES > KOP_SID_BYTES ? KOP_SPLIT_SIG_BYTES : KOP_SID_BYTES))
+#define KOP_SPLIT_MSG5_BYTES (1 + KOP_PEC_MSG3_BYTES + (KOP_SPLIT_SIG_BYTES > KOP_SID_BYTES ? KOP_SPLIT_SIG_BYTES : KOP_SID_BYTES))
+
+#define KOP_MSG0_BYTES (1 + KOP_SPLIT_PK_BYTES)
+#define KOP_MSG1_BYTES (1 + KOP_SPLIT_SIG_BYTES + KOP_SPLIT_PK_BYTES)
+#define KOP_MSG2_BYTES (1 + KOP_PEC_MSG0_BYTES + KOP_SPLIT_SIG_BYTES)
+#define KOP_MSG3_BYTES (1 + KOP_PEC_MSG1_BYTES + KOP_SPLIT_SIG_BYTES)
+#define KOP_MSG4_BYTES (1 + KOP_PEC_MSG2_BYTES + KOP_SPLIT_SIG_BYTES)
+#define KOP_MSG5_BYTES (1 + KOP_PEC_MSG3_BYTES + KOP_SPLIT_SIG_BYTES)
 
 #endif

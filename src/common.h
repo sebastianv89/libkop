@@ -5,6 +5,32 @@
 #include <stdint.h>
 #include <decaf/common.h>
 
+/*
+#ifdef KOP_DEBUG
+#include <stdio.h>
+static void print_bytes(const uint8_t *a, size_t n, int summarize) {
+    if (n <= 24 || !summarize) {
+        for (size_t i = 0; i < n; ++i) {
+            printf("%02x", a[i]);
+        }
+    } else {
+        for (size_t i = 0; i < 8; ++i) {
+            printf("%02x", a[i]);
+        }
+        printf("...");
+        for (size_t i = n/2-4; i < n/2+4; ++i) {
+            printf("%02x", a[i]);
+        }
+        printf("...");
+        for (size_t i = n-8; i < n; ++i) {
+            printf("%02x", a[i]);
+        }
+    }
+    printf(" (%zu)\n", n);
+}
+#endif
+*/
+
 typedef enum {
     KOP_RESULT_OK = 0,
     KOP_RESULT_ERROR = -1,
