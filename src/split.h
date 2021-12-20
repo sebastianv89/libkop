@@ -31,45 +31,51 @@ typedef struct {
     uint8_t pk_alice[KOP_SPLIT_PK_BYTES];
     uint8_t pk_bob[KOP_SPLIT_PK_BYTES];
     kop_pec_state_s pec;
-} kop_state_s;
+} kop_split_state_s;
 
-int kop_split_accepted(const kop_state_s *state);
+int kop_split_accepted(const kop_split_state_s *state);
+int kop_split_aborted(const kop_split_state_s *state);
 
 void kop_split_init(
-    kop_state_s *state,
+    kop_split_state_s *state,
     const uint8_t input[KOP_INPUT_BYTES]);
 
 void kop_split_alice0(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_out[KOP_SPLIT_MSG0_BYTES]);
 
 void kop_split_bob1(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_out[KOP_SPLIT_MSG1_BYTES],
     const uint8_t msg_in[KOP_SPLIT_MSG0_BYTES]);
 
+// NOTE: internal function only: changes the content of msg_in!
 kop_result_e kop_split_alice2(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_out[KOP_SPLIT_MSG2_BYTES],
     uint8_t msg_in[KOP_SPLIT_MSG1_BYTES]);
 
+// NOTE: internal function only: changes the content of msg_in!
 kop_result_e kop_split_bob3(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_out[KOP_SPLIT_MSG3_BYTES],
     uint8_t msg_in[KOP_SPLIT_MSG2_BYTES]);
 
+// NOTE: internal function only: changes the content of msg_in!
 kop_result_e kop_split_alice4(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_out[KOP_SPLIT_MSG4_BYTES],
     uint8_t msg_in[KOP_SPLIT_MSG3_BYTES]);
 
+// NOTE: internal function only: changes the content of msg_in!
 kop_result_e kop_split_bob5(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_out[KOP_SPLIT_MSG5_BYTES],
     uint8_t msg_in[KOP_SPLIT_MSG4_BYTES]);
 
+// NOTE: internal function only: changes the content of msg_in!
 kop_result_e kop_split_alice6(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_in[KOP_SPLIT_MSG5_BYTES]);
 
 #endif

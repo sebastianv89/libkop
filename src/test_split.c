@@ -20,7 +20,7 @@
 static void test_split()
 {
     kop_result_e res;
-    kop_state_s alice, bob;
+    kop_split_state_s alice, bob;
     uint8_t x[KOP_INPUT_BYTES], y[KOP_INPUT_BYTES];
     uint8_t msg0[KOP_SPLIT_MSG0_BYTES];
     uint8_t msg1[KOP_SPLIT_MSG1_BYTES];
@@ -37,9 +37,7 @@ static void test_split()
     kop_split_init(&bob, y);
     kop_split_alice0(&alice, msg0);
     kop_split_bob1(&bob, msg1, msg0);
-    assert(verify(bob.pk_alice, alice.pk_alice, KOP_SPLIT_PK_BYTES) == 0);
     res = kop_split_alice2(&alice, msg2, msg1);
-    assert(verify(alice.pk_bob, bob.pk_bob, KOP_SPLIT_PK_BYTES) == 0);
     assert(res == KOP_RESULT_OK);
     res = kop_split_bob3(&bob, msg3, msg2);
     assert(res == KOP_RESULT_OK);
@@ -62,12 +60,12 @@ static void test_split()
     msg2[1] ^= 1;
     res = kop_split_bob3(&bob, msg3, msg2);
     assert(res == KOP_RESULT_ERROR);
-}
+}    
 
 static void test_sidechannels()
 {
     uint8_t x[KOP_INPUT_BYTES], y[KOP_INPUT_BYTES];
-    kop_state_s alice, bob;
+    kop_split_state_s alice, bob;
     uint8_t msg0[KOP_SPLIT_MSG0_BYTES];
     uint8_t msg1[KOP_SPLIT_MSG1_BYTES];
     uint8_t msg2[KOP_SPLIT_MSG2_BYTES];

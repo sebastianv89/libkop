@@ -62,7 +62,6 @@ void kop_pec_bob_m3(
     uint8_t msg_out[KOP_PEC_MSG3_BYTES],
     const uint8_t msg_in[KOP_PEC_MSG2_BYTES]);
 
-
 // Alice processes msg_in (m3) and accepts/rejects.
 //
 // Set state->accept to 1 if accepted (x==y), or to 0 if rejected (x != y)

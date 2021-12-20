@@ -12,6 +12,7 @@
 #include "ot.h"
 #include "pec.h"
 #include "split.h"
+#include "kop.h"
 #include "params.h"
 #include "randombytes.h"
 
@@ -19,6 +20,7 @@
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
+#define MAX(a,b) (a>b?a:b)
 
 static void measure_ec_validation(float seconds) {
     uint8_t buf[DECAF_448_SER_BYTES];
@@ -112,7 +114,7 @@ static void measure_kem_pq(float seconds)
     uint8_t ct[KOP_PQ_CT_BYTES];
     uint8_t ss[KOP_PQ_SS_BYTES];
 
-    printf("  KEM PQ: %s\n", XSTR(KOP_KEM_ALG));
+    printf("  KEM PQ: %s\n", XSTR(KOP_PQ_ALG));
 
     TIME_OPERATION_SECONDS(kop_pq_keygen(&pk, sk), "keygen", seconds)
     TIME_OPERATION_SECONDS(kop_pq_encaps(ct, ss, &pk), "encaps", seconds)
@@ -133,7 +135,6 @@ static void measure_kem(float seconds)
     TIME_OPERATION_SECONDS(kop_kem_decaps(&ss, ct, &sk), "decaps", seconds)
 }
 
-
 static void measure_ot(float seconds)
 {
     kop_kem_ss_s secret, secrets[KOP_OT_M];
@@ -148,7 +149,7 @@ static void measure_ot(float seconds)
     hid.ot = 0;
     index = 0;
 
-    printf("  OT: %s, M=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_M);
+    printf("  OT: %s, M=%u\n", XSTR(KOP_PQ_ALG), KOP_OT_M);
 
     TIME_OPERATION_SECONDS(kop_ot_recv_init(&recv, recv_msg, index, hid), "recv init", seconds)
     TIME_OPERATION_SECONDS(kop_ot_send(secrets, send_msg, recv_msg, hid), "send", seconds)
@@ -171,7 +172,7 @@ static void measure_pec(float seconds)
     kop_pec_set_input(&bob, input);
     kop_pec_set_sid(&bob, sid);
 
-    printf("  PEC: %s, M=%u, N=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_M, KOP_PEC_N);
+    printf("  PEC: %s, M=%u, N=%u\n", XSTR(KOP_PQ_ALG), KOP_OT_M, KOP_PEC_N);
 
     TIME_OPERATION_SECONDS(kop_pec_alice_m0(&alice, msg0), "alice m0", seconds)
     TIME_OPERATION_SECONDS(kop_pec_bob_m1(&bob, msg1, msg0), "bob m1", seconds)
@@ -180,32 +181,72 @@ static void measure_pec(float seconds)
     TIME_OPERATION_SECONDS(kop_pec_alice_accept(&alice, msg3), "alice accept", seconds)
 }
 
+static void measure_sign(float seconds)
+{
+    uint8_t sk[KOP_SPLIT_SK_BYTES];
+    uint8_t pk[KOP_SPLIT_PK_BYTES];
+    uint8_t sig[KOP_SPLIT_SIG_BYTES];
+    uint8_t msg[1024];
+    size_t sig_len;
+
+    printf("  signature (1024 byte message): %s\n", XSTR(KOP_SPLIT_ALG));
+
+    TIME_OPERATION_SECONDS(KOP_SPLIT_KEYGEN(pk, sk), "keygen", seconds)
+    TIME_OPERATION_SECONDS(KOP_SPLIT_SIGN(sig, &sig_len, msg, 1024, sk), "sign", seconds)
+    TIME_OPERATION_SECONDS(KOP_SPLIT_VERIFY(msg, 1024, sig, KOP_SPLIT_SIG_BYTES, pk), "verify", seconds)
+}
+
 static void measure_split(float seconds)
 {
-    uint8_t sid[KOP_SID_BYTES], input[KOP_INPUT_BYTES];
-    kop_state_s alice, bob;
+    uint8_t input[KOP_INPUT_BYTES];
+    kop_split_state_s alice, bob;
     uint8_t msg0[KOP_SPLIT_MSG0_BYTES];
-    uint8_t msg1[KOP_SPLIT_MSG1_BYTES];
-    uint8_t msg2[KOP_SPLIT_MSG2_BYTES];
-    uint8_t msg3[KOP_SPLIT_MSG3_BYTES];
-    uint8_t msg4[KOP_SPLIT_MSG4_BYTES];
-    uint8_t msg5[KOP_SPLIT_MSG5_BYTES];
+    uint8_t msg1[KOP_SPLIT_MSG1_BYTES], msg1_copy[KOP_SPLIT_MSG1_BYTES];
+    uint8_t msg2[KOP_SPLIT_MSG2_BYTES], msg2_copy[KOP_SPLIT_MSG2_BYTES];
+    uint8_t msg3[KOP_SPLIT_MSG3_BYTES], msg3_copy[KOP_SPLIT_MSG3_BYTES];
+    uint8_t msg4[KOP_SPLIT_MSG4_BYTES], msg4_copy[KOP_SPLIT_MSG4_BYTES];
+    uint8_t msg5[KOP_SPLIT_MSG5_BYTES], msg5_copy[KOP_SPLIT_MSG5_BYTES];
 
-    randombytes(sid, KOP_SID_BYTES);
     randombytes(input, KOP_INPUT_BYTES);
-    kop_split_init(&alice, input);
+
+    printf("  SPLIT: %s, %s, M=%u, N=%u\n", XSTR(KOP_PQ_ALG), XSTR(KOP_SPLIT_ALG), KOP_OT_M, KOP_PEC_N);
+
+    TIME_OPERATION_SECONDS(kop_split_init(&alice, input), "init", seconds)
     kop_split_init(&bob, input);
+    TIME_OPERATION_SECONDS(kop_split_alice0(&alice, msg0), "alice split 0", seconds)
+    TIME_OPERATION_SECONDS(kop_split_bob1(&bob, msg1, msg0), "bob split 1", seconds)
+    TIME_OPERATION_WITH_INIT_SECONDS(memcpy(msg1_copy, msg1, KOP_SPLIT_MSG1_BYTES), kop_split_alice2(&alice, msg2, msg1_copy), "alice split 2", seconds)
+    TIME_OPERATION_WITH_INIT_SECONDS(memcpy(msg2_copy, msg2, KOP_SPLIT_MSG2_BYTES), kop_split_bob3(&bob, msg3, msg2_copy), "bob split 3", seconds)
+    TIME_OPERATION_WITH_INIT_SECONDS(memcpy(msg3_copy, msg3, KOP_SPLIT_MSG3_BYTES), kop_split_alice4(&alice, msg4, msg3_copy), "alice split 4", seconds)
+    TIME_OPERATION_WITH_INIT_SECONDS(memcpy(msg4_copy, msg4, KOP_SPLIT_MSG4_BYTES), kop_split_bob5(&bob, msg5, msg4_copy), "bob split 5", seconds)
+    TIME_OPERATION_WITH_INIT_SECONDS(memcpy(msg5_copy, msg5, KOP_SPLIT_MSG5_BYTES), kop_split_alice6(&alice, msg5_copy), "alice split 6", seconds)
+}
 
-    printf("  PEC: %s, M=%u, N=%u\n", XSTR(KOP_KEM_ALG), KOP_OT_M, KOP_PEC_N);
+static void measure_kop(float seconds)
+{
+    uint8_t input[KOP_INPUT_BYTES];
+    kop_state_s alice, bob;
+    uint8_t msg0[KOP_MSG0_BYTES];
+    uint8_t msg1[KOP_MSG1_BYTES];
+    uint8_t msg2[KOP_MSG2_BYTES];
+    uint8_t msg3[KOP_MSG3_BYTES];
+    uint8_t msg4[KOP_MSG4_BYTES];
+    uint8_t msg5[KOP_MSG5_BYTES];
+    size_t msg_bytes;
 
-    TIME_OPERATION_SECONDS(kop_split_init(&alice, input), "alice init", seconds)
-    TIME_OPERATION_SECONDS(kop_split_alice0(&alice, msg0), "alice m0", seconds)
-    TIME_OPERATION_SECONDS(kop_split_bob1(&bob, msg1, msg0), "bob m1", seconds)
-    TIME_OPERATION_SECONDS(kop_split_alice2(&alice, msg2, msg1), "alice m2", seconds)
-    TIME_OPERATION_SECONDS(kop_split_bob3(&bob, msg3, msg2), "bob m3", seconds)
-    TIME_OPERATION_SECONDS(kop_split_alice4(&alice, msg4, msg3), "alice m4", seconds)
-    TIME_OPERATION_SECONDS(kop_split_bob5(&alice, msg5, msg4), "bob m5", seconds)
-    TIME_OPERATION_SECONDS(kop_split_alice6(&alice, msg5), "alice accept", seconds)
+    randombytes(input, KOP_INPUT_BYTES);
+
+    printf("  KOP: %s, %s, M=%u, N=%u\n", XSTR(KOP_PQ_ALG), XSTR(KOP_SPLIT_ALG), KOP_OT_M, KOP_PEC_N);
+
+    TIME_OPERATION_SECONDS(kop_init(&alice, input), "init", seconds)
+    kop_init(&bob, input);
+    TIME_OPERATION_WITH_INIT_SECONDS(alice.split.state = KOP_STATE_INIT, kop_msg0(&alice, msg0), "alice0", seconds)
+    TIME_OPERATION_WITH_INIT_SECONDS(bob.split.state = KOP_STATE_INIT, kop_process_msg(&bob, msg1, &msg_bytes, msg0, KOP_MSG0_BYTES), "bob1", seconds)
+    TIME_OPERATION_WITH_INIT_SECONDS(alice.split.state = KOP_STATE_EXPECT_BOB1, kop_process_msg(&alice, msg2, &msg_bytes, msg1, KOP_MSG1_BYTES), "alice2", seconds)
+    TIME_OPERATION_WITH_INIT_SECONDS(bob.split.state = KOP_STATE_EXPECT_ALICE2, kop_process_msg(&bob, msg3, &msg_bytes, msg2, KOP_MSG2_BYTES), "bob3", seconds)
+    TIME_OPERATION_WITH_INIT_SECONDS(alice.split.state = KOP_STATE_EXPECT_BOB3, kop_process_msg(&alice, msg4, &msg_bytes, msg3, KOP_MSG3_BYTES), "alice4", seconds)
+    TIME_OPERATION_WITH_INIT_SECONDS(bob.split.state = KOP_STATE_EXPECT_ALICE4, kop_process_msg(&bob, msg5, &msg_bytes, msg4, KOP_MSG4_BYTES), "bob5", seconds)
+    TIME_OPERATION_WITH_INIT_SECONDS(alice.split.state = KOP_STATE_EXPECT_BOB5, kop_process_msg(&alice, NULL, &msg_bytes, msg5, KOP_MSG5_BYTES), "alice6", seconds)
 }
 
 int main(int argc, char *argv[])
@@ -219,7 +260,10 @@ int main(int argc, char *argv[])
             return EXIT_FAILURE;
         }
     }
-
+#ifdef KOP_DEBUG
+    fprintf(stderr, "Debugging code still on, not running speed tests!\n");
+    return EXIT_FAILURE;
+#else
     PRINT_TIMER_HEADER
     measure_ec_validation(seconds);
     measure_group_ec(seconds);
@@ -230,9 +274,11 @@ int main(int argc, char *argv[])
     measure_kem(seconds);
     measure_ot(seconds);
     measure_pec(seconds);
+    measure_sign(seconds);
     measure_split(seconds);
+    measure_kop(seconds);
     PRINT_TIMER_FOOTER
-
     return EXIT_SUCCESS;
+#endif
 }
 

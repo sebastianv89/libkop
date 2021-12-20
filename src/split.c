@@ -1,30 +1,40 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+
+#ifdef KOP_DEBUG
 #include <assert.h>
+#endif
 
 #include "split.h"
 
-int kop_split_accepted(const kop_state_s *state)
+int kop_split_accepted(const kop_split_state_s *state)
 {
     return (state->state == KOP_STATE_DONE && state->pec.accept);
 }
 
+int kop_split_aborted(const kop_split_state_s *state)
+{
+    return (state->state == KOP_STATE_ABORTED);
+}
+
 void kop_split_init(
-    kop_state_s *state,
+    kop_split_state_s *state,
     const uint8_t input[KOP_INPUT_BYTES])
 {
-    memset(state, 0, sizeof(kop_state_s));
+    memset(state, 0, sizeof(kop_split_state_s));
     kop_pec_set_input(&state->pec, input);
 
     state->state = KOP_STATE_INIT;
 }
 
 void kop_split_alice0(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_out[KOP_SPLIT_MSG0_BYTES])
 {
+#ifdef KOP_DEBUG
     assert(state->state == KOP_STATE_INIT);
+#endif
 
     OQS_UNWRAP(KOP_SPLIT_KEYGEN(state->pk_alice, state->sk));
     msg_out[0] = (uint8_t)(KOP_SPLIT_TAG_ALICE0);
@@ -34,13 +44,15 @@ void kop_split_alice0(
 }
 
 void kop_split_bob1(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_out[KOP_SPLIT_MSG1_BYTES],
     const uint8_t msg_in[KOP_SPLIT_MSG0_BYTES])
 {
     size_t sig_len;
+#ifdef KOP_DEBUG
     assert(state->state == KOP_STATE_INIT);
     assert(msg_in[0] == KOP_SPLIT_TAG_ALICE0);
+#endif
 
     OQS_UNWRAP(KOP_SPLIT_KEYGEN(state->pk_bob, state->sk));
     memcpy(state->pk_alice, &msg_in[1], KOP_SPLIT_PK_BYTES);
@@ -54,14 +66,16 @@ void kop_split_bob1(
 }
 
 kop_result_e kop_split_alice2(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_out[KOP_SPLIT_MSG2_BYTES],
     uint8_t msg_in[KOP_SPLIT_MSG1_BYTES])
 {
     uint8_t sig[KOP_SPLIT_SIG_BYTES];
     size_t sig_len;
+#ifdef KOP_DEBUG
     assert(state->state == KOP_STATE_EXPECT_BOB1);
     assert(msg_in[0] == KOP_SPLIT_TAG_BOB1);
+#endif
 
     memcpy(sig, &msg_in[1], KOP_SPLIT_SIG_BYTES);
     memmove(&msg_in[1 + KOP_SPLIT_PK_BYTES], &msg_in[1 + KOP_SPLIT_SIG_BYTES], KOP_SPLIT_PK_BYTES);
@@ -82,14 +96,16 @@ kop_result_e kop_split_alice2(
 }
 
 kop_result_e kop_split_bob3(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_out[KOP_SPLIT_MSG3_BYTES],
     uint8_t msg_in[KOP_SPLIT_MSG2_BYTES])
 {
     uint8_t sig[KOP_SPLIT_SIG_BYTES];
     size_t sig_len;
+#ifdef KOP_DEBUG
     assert(state->state == KOP_STATE_EXPECT_ALICE2);
     assert(msg_in[0] == KOP_SPLIT_TAG_ALICE2);
+#endif
 
     memcpy(sig, &msg_in[1 + KOP_PEC_MSG0_BYTES], KOP_SPLIT_SIG_BYTES);
     memcpy(&msg_in[1 + KOP_PEC_MSG0_BYTES], state->pk_alice, KOP_SPLIT_PK_BYTES);
@@ -112,14 +128,16 @@ kop_result_e kop_split_bob3(
 }
 
 kop_result_e kop_split_alice4(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_out[KOP_SPLIT_MSG4_BYTES],
     uint8_t msg_in[KOP_SPLIT_MSG3_BYTES])
 {
     uint8_t sig[KOP_SPLIT_SIG_BYTES];
     size_t sig_len;
+#ifdef KOP_DEBUG
     assert(state->state == KOP_STATE_EXPECT_BOB3);
     assert(msg_in[0] == KOP_SPLIT_TAG_BOB3);
+#endif
 
     memcpy(sig, &msg_in[1 + KOP_PEC_MSG1_BYTES], KOP_SPLIT_SIG_BYTES);
     memcpy(&msg_in[1 + KOP_PEC_MSG1_BYTES], state->pk_alice, KOP_SPLIT_PK_BYTES);
@@ -142,14 +160,16 @@ kop_result_e kop_split_alice4(
 }
 
 kop_result_e kop_split_bob5(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_out[KOP_SPLIT_MSG5_BYTES],
     uint8_t msg_in[KOP_SPLIT_MSG4_BYTES])
 {
     uint8_t sig[KOP_SPLIT_SIG_BYTES];
     size_t sig_len;
+#ifdef KOP_DEBUG
     assert(state->state == KOP_STATE_EXPECT_ALICE4);
     assert(msg_in[0] == KOP_SPLIT_TAG_ALICE4);
+#endif
 
     memcpy(sig, &msg_in[1 + KOP_PEC_MSG2_BYTES], KOP_SPLIT_SIG_BYTES);
     memcpy(&msg_in[1 + KOP_PEC_MSG2_BYTES], state->pk_alice, KOP_SPLIT_PK_BYTES);
@@ -169,12 +189,14 @@ kop_result_e kop_split_bob5(
 }
 
 kop_result_e kop_split_alice6(
-    kop_state_s *state,
+    kop_split_state_s *state,
     uint8_t msg_in[KOP_SPLIT_MSG5_BYTES])
 {
     uint8_t sig[KOP_SPLIT_SIG_BYTES];
+#ifdef KOP_DEBUG
     assert(state->state == KOP_STATE_EXPECT_BOB5);
     assert(msg_in[0] == KOP_SPLIT_TAG_BOB5);
+#endif
 
     memcpy(sig, &msg_in[1 + KOP_PEC_MSG3_BYTES], KOP_SPLIT_SIG_BYTES);
     memcpy(&msg_in[1 + KOP_PEC_MSG3_BYTES], state->pk_alice, KOP_SPLIT_PK_BYTES);
