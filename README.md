@@ -27,9 +27,9 @@ Compiling
 ---------
 
 In order to compile the library, make sure that the following libraries are installed:
- - [libXKCP][https://github.com/XKCP/XKCP] (make sure the KeccakHash service is enabled)
- - [libdecaf][https://sourceforge.net/projects/ed448goldilocks/]
- - [liboqs][https://openquantumsafe.org/liboqs/]
+ - [libXKCP](https://github.com/XKCP/XKCP) (make sure the KeccakHash interface is enabled)
+ - [libdecaf](https://sourceforge.net/projects/ed448goldilocks/)
+ - [liboqs](https://openquantumsafe.org/liboqs/) (make sure Kyber and Dilithium are enabled)
 
 
 Testing
