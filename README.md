@@ -22,6 +22,25 @@ instantiated with [Dilithium][dilithium] signatures.
 This work accompanies my thesis and relies on the work done by Masny,
 Rindal and Rosulek [rr17], [mr19].
 
+
+Compiling
+---------
+
+In order to compile the library, make sure that the following libraries are installed:
+ - [libXKCP][https://github.com/XKCP/XKCP] (make sure the KeccakHash service is enabled)
+ - [libdecaf][https://sourceforge.net/projects/ed448goldilocks/]
+ - [liboqs][https://openquantumsafe.org/liboqs/]
+
+
+Testing
+-------
+
+Once compiled, build the `all` target to build all test-files.
+Run each `test_*` target to test the corresponding functionality.
+(`test_kop` tests the overall functionality).
+Run `test_speed` for benchmarking the code.
+
+
 References
 ----------
 
